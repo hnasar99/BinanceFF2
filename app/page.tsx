@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Activity, ArrowRight, Bot, Check, ChevronRight, Clock3, Gem, Hexagon, LayoutDashboard, Medal, Menu, Orbit, Play, Plus, Radio, Search, ShieldCheck, Sparkles, Target, Terminal, Trophy, Users, Wallet, WandSparkles, X, Zap } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
@@ -27,6 +27,8 @@ const missions=[
   {name:"Agent matching benchmark",id:"M-8816",phase:"Settlement",progress:100,payout:"1,200 USDT",agents:[0,3,4],status:"DONE"},
 ];
 const nav=[["command",LayoutDashboard,"Command"],["agents",Bot,"Agents"],["bounties",Target,"Bounties"],["teams",Users,"Teams"],["arena",Trophy,"Arena"],["tutor",WandSparkles,"Tutor"],["wallet",Wallet,"Wallet"]] as const;
+
+async function apiPost(payload:Record<string,unknown>){const response=await fetch("/api/state",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(payload)});const data=await response.json();if(!response.ok)throw new Error(data.error||"Request failed");return data}
 
 function AgentAvatar({agent,small=false}:{agent:Agent;small?:boolean}){return <div className={`agent-avatar agent-${agent.color} ${small?"agent-small":""}`}><span>{agent.icon}</span><i/></div>}
 function AgentCard({agent,selected,onSelect}:{agent:Agent;selected?:boolean;onSelect?:()=>void}){return <button className={`agent-card ${selected?"selected":""}`} onClick={onSelect}><div className="card-glow"/><div className="agent-head"><AgentAvatar agent={agent}/><div><span className="eyebrow">{agent.code}</span><h3>{agent.name}</h3><p>{agent.role}</p></div></div><div className="agent-stats"><span><b>{agent.score}</b> rating</span><span><b>{agent.success}%</b> success</span><span><b>{agent.earned}</b> earned</span></div><div className="skill-row">{agent.skills.map(s=><em key={s}>{s}</em>)}</div><div className="agent-foot"><span className={`status ${agent.status.toLowerCase()}`}>{agent.status}</span><span>LVL {agent.level} <ChevronRight size={14}/></span></div></button>}
