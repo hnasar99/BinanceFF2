@@ -13,12 +13,12 @@ import {
   Play,
   Radio,
   ShieldCheck,
-  Target,
   Terminal,
   Zap,
 } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
+import { MissionWorld3D } from "./mission-world-3d";
 
 export type ConsoleMission = {
   id: string;
@@ -29,19 +29,13 @@ export type ConsoleMission = {
   progress?: number;
   kind: "mission" | "bounty";
 };
-const squad = [
-  { name: "NEXUS", role: "Discovery", glyph: "◈", color: "cyan" },
-  { name: "VECTOR", role: "Simulation", glyph: "V", color: "violet" },
-  { name: "AEGIS", role: "Risk guard", glyph: "A", color: "yellow" },
-  { name: "ORACLE", role: "Verification", glyph: "O", color: "emerald" },
-];
 const phases = [
-  "Scope locked",
-  "Sources acquired",
-  "Routes simulated",
-  "Risk gate passed",
-  "Evidence verified",
-  "Settlement ready",
+  "Goal agreed",
+  "Information gathered",
+  "Options tested",
+  "Risks checked",
+  "Result verified",
+  "Payment ready",
 ];
 const logLines = [
   ["NEXUS", "Indexed 18 BNB liquidity pools · block 52,841,092"],
@@ -72,8 +66,7 @@ export function MissionConsole({
     }, 1800);
     return () => clearInterval(timer);
   }, [running, progress]);
-  const phaseIndex = Math.min(phases.length - 1, Math.floor(progress / 18)),
-    phase = phases[phaseIndex];
+  const phaseIndex = Math.min(phases.length - 1, Math.floor(progress / 18));
   const elapsed = useMemo(
     () =>
       `00:${String(Math.floor(progress / 3)).padStart(2, "0")}:${String((progress * 7) % 60).padStart(2, "0")}`,
@@ -104,80 +97,55 @@ export function MissionConsole({
           </span>
           <h1>{mission.title}</h1>
           <p>
-            Autonomous squad executing under a revocable 72-hour economic
-            mandate.
+            Four AI agents are working together. You can watch what each one
+            does, stop them at any time, and pay only after the result is
+            checked.
           </p>
         </div>
         <div className="console-reward">
           <Gem />
-          <span>ESCROWED REWARD</span>
+          <span>REWARD RESERVED</span>
           <b>{mission.reward}</b>
-          <small>ERC-8183 · release after verified evidence</small>
+          <small>Paid only when the result is verified</small>
         </div>
       </section>
       <section className="console-stats">
         <article>
           <Activity />
-          <span>MISSION PROGRESS</span>
+          <span>HOW MUCH IS DONE</span>
           <b>{progress}%</b>
           <Progress value={progress} />
         </article>
         <article>
           <Clock3 />
-          <span>ELAPSED TIME</span>
+          <span>TIME WORKING</span>
           <b>{elapsed}</b>
           <small>ETA 02:14:30</small>
         </article>
         <article>
           <ShieldCheck />
-          <span>MANDATE STATUS</span>
-          <b className="safe">COMPLIANT</b>
-          <small>847 / 1,200 USDT available</small>
+          <span>SAFETY LIMITS</span>
+          <b className="safe">ALL SAFE</b>
+          <small>Agents cannot spend or transfer without approval</small>
         </article>
         <article>
           <FileCheck2 />
-          <span>EVIDENCE</span>
+          <span>PROOF COLLECTED</span>
           <b>{Math.max(3, tick * 4)} ITEMS</b>
           <small>
-            {tick > 5 ? "Digest sealing" : "Collecting and verifying"}
+            {tick > 5
+              ? "Final proof being sealed"
+              : "Sources are being checked"}
           </small>
         </article>
       </section>
       <div className="console-grid">
         <section className="battlefield">
-          <div className="battle-grid" />
-          <div className="mission-core">
-            <Target />
-            <strong>MISSION CORE</strong>
-            <span>{phase}</span>
-            <i
-              style={
-                { "--mission-progress": `${progress}%` } as React.CSSProperties
-              }
-            />
-          </div>
-          {squad.map((agent, index) => (
-            <article
-              className={`battle-agent battle-agent-${index + 1} ${running ? "working" : ""}`}
-              key={agent.name}
-            >
-              <div className={`console-avatar agent-${agent.color}`}>
-                <span>{agent.glyph}</span>
-                <i />
-              </div>
-              <b>{agent.name}</b>
-              <small>{agent.role}</small>
-              <em>{index <= phaseIndex ? "EXECUTING" : "QUEUED"}</em>
-            </article>
-          ))}
-          <div className="data-stream stream-a" />
-          <div className="data-stream stream-b" />
-          <div className="data-stream stream-c" />
-          <div className="data-stream stream-d" />
+          <MissionWorld3D progress={progress} running={running} />
         </section>
         <aside className="objective-panel">
           <div className="panel-title">
-            <span>MISSION OBJECTIVES</span>
+            <span>WHAT HAPPENS NEXT</span>
             <small>
               {phaseIndex + 1}/{phases.length}
             </small>
@@ -194,8 +162,8 @@ export function MissionConsole({
                   {index < phaseIndex
                     ? "Verified"
                     : index === phaseIndex
-                      ? "In progress"
-                      : "Awaiting squad"}
+                      ? "Happening now"
+                      : "Comes next"}
                 </small>
               </div>
             </div>
@@ -203,9 +171,9 @@ export function MissionConsole({
           <div className="authority-box">
             <ShieldCheck />
             <div>
-              <b>Authority shield active</b>
-              <span>read · simulate · propose</span>
-              <small>Transfers require your approval</small>
+              <b>You remain in control</b>
+              <span>Agents may read, test and recommend</span>
+              <small>They cannot move money without you</small>
             </div>
           </div>
         </aside>
