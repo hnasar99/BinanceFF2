@@ -4,8 +4,10 @@ import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import {
   ContactShadows,
   Grid,
+  Hud as DreiHud,
   Line,
   MeshReflectorMaterial,
+  OrthographicCamera,
   Sparkles,
   Stars,
 } from "@react-three/drei";
@@ -72,7 +74,7 @@ type StatePayload = {
 
 function Label({ children, color = MUTED }: { children: ReactNode; color?: string }) {
   return (
-    <Text fontSize={12} lineHeight={15} letterSpacing={1.25} color={color} fontWeight="bold">
+    <Text fontSize={13} lineHeight="16px" letterSpacing={1.1} color={color} fontWeight="bold">
       {children}
     </Text>
   );
@@ -87,6 +89,8 @@ function Panel({ children, ...props }: ComponentProps<typeof Container>) {
       borderRadius={12}
       padding={18}
       flexDirection="column"
+      alignItems="stretch"
+      overflow="hidden"
       {...props}
     >
       {children}
@@ -106,7 +110,7 @@ function Primary({ children, onClick, disabled = false }: { children: ReactNode;
       hover={{ backgroundColor: "#ffd665", transformScale: 1.015 }}
       active={{ transformScale: 0.98 }}
     >
-      <Text fontSize={13} lineHeight={16} fontWeight="bold" letterSpacing={0.65}>{children}</Text>
+      <Text fontSize={14} lineHeight="17px" fontWeight="bold" letterSpacing={0.55}>{children}</Text>
     </Button>
   );
 }
@@ -124,7 +128,7 @@ function Ghost({ children, onClick, active = false }: { children: ReactNode; onC
       hover={{ backgroundColor: "#16243a", color: "#ffffff" }}
       active={{ transformScale: 0.98 }}
     >
-      <Text fontSize={12} lineHeight={15} fontWeight="bold" letterSpacing={0.5}>{children}</Text>
+      <Text fontSize={13} lineHeight="16px" fontWeight="bold" letterSpacing={0.4}>{children}</Text>
     </Button>
   );
 }
@@ -133,8 +137,8 @@ function Metric({ label, value, detail, color = "#f4f7ff" }: { label: string; va
   return (
     <Panel flexGrow={1} minWidth={145} gap={5} padding={15}>
       <Label>{label}</Label>
-      <Text fontSize={24} lineHeight={28} fontWeight="bold" color={color}>{value}</Text>
-      <Text fontSize={12} lineHeight={16} color={MUTED}>{detail}</Text>
+      <Text fontSize={24} lineHeight="28px" fontWeight="bold" color={color}>{value}</Text>
+      <Text fontSize={13} lineHeight="17px" color={MUTED}>{detail}</Text>
     </Panel>
   );
 }
@@ -143,10 +147,10 @@ function Title({ eyebrow, title, description, compact }: { eyebrow: string; titl
   return (
     <Container flexDirection="column" gap={6} flexShrink={0}>
       <Label color={CYAN}>{eyebrow}</Label>
-      <Text fontSize={compact ? 30 : 42} lineHeight={compact ? 35 : 47} fontWeight="bold" color="#f8fbff">
+      <Text fontSize={compact ? 30 : 40} lineHeight={compact ? "35px" : "45px"} fontWeight="bold" color="#f8fbff">
         {title}
       </Text>
-      <Text fontSize={14} lineHeight={20} color={MUTED} maxWidth={760}>{description}</Text>
+      <Text fontSize={15} lineHeight="21px" color={MUTED} maxWidth={760}>{description}</Text>
     </Container>
   );
 }
@@ -197,7 +201,7 @@ function ArmorMaterial({ color = "#172335", accent }: { color?: string; accent?:
     <meshPhysicalMaterial
       color={color}
       emissive={accent || "#000000"}
-      emissiveIntensity={accent ? 0.16 : 0}
+      emissiveIntensity={accent ? 0.07 : 0}
       metalness={0.88}
       roughness={0.2}
       clearcoat={0.8}
@@ -236,14 +240,14 @@ function RobotAgent({ agent, index, selected, onSelect }: { agent: Agent; index:
     >
       <Select enabled>
         <group>
-          <pointLight color={agent.color} intensity={selected ? 9 : 5} distance={4.5} />
+          <pointLight color={agent.color} intensity={selected ? 3.2 : 1.5} distance={3.8} decay={2} />
           <mesh position={[0, 1.75, 0]} castShadow>
             <sphereGeometry args={[0.34, 32, 24]} />
             <ArmorMaterial color="#182638" accent={agent.color} />
           </mesh>
           <mesh position={[0, 1.72, 0.305]} scale={[1, 0.34, 0.12]}>
             <sphereGeometry args={[0.25, 32, 16]} />
-            <meshStandardMaterial color={agent.color} emissive={agent.color} emissiveIntensity={3.6} toneMapped={false} />
+            <meshStandardMaterial color={agent.color} emissive={agent.color} emissiveIntensity={1.05} toneMapped />
           </mesh>
           <mesh position={[0, 1.16, 0]} castShadow>
             <capsuleGeometry args={[0.43, 0.66, 12, 24]} />
@@ -251,7 +255,7 @@ function RobotAgent({ agent, index, selected, onSelect }: { agent: Agent; index:
           </mesh>
           <mesh position={[0, 1.24, 0.43]}>
             <octahedronGeometry args={[0.145, 2]} />
-            <meshStandardMaterial color={agent.color} emissive={agent.color} emissiveIntensity={3} toneMapped={false} />
+            <meshStandardMaterial color={agent.color} emissive={agent.color} emissiveIntensity={0.9} toneMapped />
           </mesh>
           {[-1, 1].map((side) => (
             <group key={side}>
@@ -283,34 +287,34 @@ function RobotAgent({ agent, index, selected, onSelect }: { agent: Agent; index:
               {[-1, 1].map((side) => (
                 <mesh key={side} position={[side * 0.58, 0.08, -0.18]} rotation={[0.25, 0, side * -0.55]}>
                   <boxGeometry args={[0.75, 0.06, 0.34]} />
-                  <meshStandardMaterial color="#18384a" emissive={CYAN} emissiveIntensity={0.7} metalness={0.8} roughness={0.25} />
+                  <meshStandardMaterial color="#18384a" emissive={CYAN} emissiveIntensity={0.25} metalness={0.8} roughness={0.25} />
                 </mesh>
               ))}
             </group>
           )}
           {isVector && (
             <group ref={halo} position={[0, 1.2, -0.08]} rotation={[Math.PI / 2, 0, 0]}>
-              <mesh><torusGeometry args={[0.72, 0.025, 12, 96]} /><meshBasicMaterial color={VIOLET} transparent opacity={0.9} toneMapped={false} /></mesh>
-              <mesh rotation={[0.8, 0, 0]}><torusGeometry args={[0.57, 0.012, 8, 96]} /><meshBasicMaterial color={CYAN} transparent opacity={0.65} toneMapped={false} /></mesh>
+              <mesh><torusGeometry args={[0.72, 0.025, 12, 96]} /><meshBasicMaterial color={VIOLET} transparent opacity={0.58} toneMapped /></mesh>
+              <mesh rotation={[0.8, 0, 0]}><torusGeometry args={[0.57, 0.012, 8, 96]} /><meshBasicMaterial color={CYAN} transparent opacity={0.42} toneMapped /></mesh>
             </group>
           )}
           {isAegis && (
             <group position={[-0.82, 0.93, 0.18]} rotation={[0, 0.2, 0]}>
               <mesh><cylinderGeometry args={[0.56, 0.56, 0.065, 8]} /><ArmorMaterial color="#40351a" accent={GOLD} /></mesh>
-              <mesh position={[0, 0.04, 0]}><cylinderGeometry args={[0.38, 0.38, 0.075, 8]} /><meshStandardMaterial color={GOLD} emissive={GOLD} emissiveIntensity={1.2} metalness={0.7} roughness={0.2} /></mesh>
+              <mesh position={[0, 0.04, 0]}><cylinderGeometry args={[0.38, 0.38, 0.075, 8]} /><meshStandardMaterial color={GOLD} emissive={GOLD} emissiveIntensity={0.38} metalness={0.7} roughness={0.2} /></mesh>
             </group>
           )}
           {isOracle && (
             <group ref={halo} position={[0, 1.36, 0]}>
-              <mesh rotation={[Math.PI / 2, 0, 0]}><torusGeometry args={[0.62, 0.017, 8, 80]} /><meshBasicMaterial color={GREEN} transparent opacity={0.8} toneMapped={false} /></mesh>
-              <mesh rotation={[0, Math.PI / 2, 0]}><torusGeometry args={[0.62, 0.017, 8, 80]} /><meshBasicMaterial color={CYAN} transparent opacity={0.62} toneMapped={false} /></mesh>
+              <mesh rotation={[Math.PI / 2, 0, 0]}><torusGeometry args={[0.62, 0.017, 8, 80]} /><meshBasicMaterial color={GREEN} transparent opacity={0.52} toneMapped /></mesh>
+              <mesh rotation={[0, Math.PI / 2, 0]}><torusGeometry args={[0.62, 0.017, 8, 80]} /><meshBasicMaterial color={CYAN} transparent opacity={0.4} toneMapped /></mesh>
             </group>
           )}
         </group>
       </Select>
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.28, 0]}>
         <ringGeometry args={[0.55, 0.64, 64]} />
-        <meshBasicMaterial color={agent.color} transparent opacity={selected ? 0.86 : 0.32} toneMapped={false} side={THREE.DoubleSide} />
+        <meshBasicMaterial color={agent.color} transparent opacity={selected ? 0.58 : 0.24} toneMapped side={THREE.DoubleSide} />
       </mesh>
     </group>
   );
@@ -331,20 +335,20 @@ function EnergyCore({ onOpen }: { onOpen: () => void }) {
     <group position={[5.15, 0, -1.05]} onClick={(event) => { event.stopPropagation(); onOpen(); }}>
       <Select enabled>
         <group ref={core}>
-          <pointLight color={GOLD} intensity={22} distance={8} decay={2} />
+          <pointLight color={GOLD} intensity={6.5} distance={7} decay={2} />
           <mesh castShadow>
             <icosahedronGeometry args={[0.92, 4]} />
-            <meshPhysicalMaterial color="#d78912" emissive={GOLD} emissiveIntensity={1.9} metalness={0.66} roughness={0.12} clearcoat={1} />
+            <meshPhysicalMaterial color="#9c6818" emissive={GOLD} emissiveIntensity={0.65} metalness={0.72} roughness={0.19} clearcoat={1} />
           </mesh>
           <mesh scale={1.035}>
             <icosahedronGeometry args={[0.92, 2]} />
-            <meshBasicMaterial color="#fff2a4" wireframe transparent opacity={0.66} toneMapped={false} />
+            <meshBasicMaterial color="#ffe17a" wireframe transparent opacity={0.32} toneMapped />
           </mesh>
         </group>
         <group ref={rings} position={[0, 0.45, 0]}>
-          <mesh rotation={[Math.PI / 2, 0, 0]}><torusGeometry args={[1.35, 0.026, 12, 128]} /><meshBasicMaterial color={CYAN} transparent opacity={0.82} toneMapped={false} /></mesh>
-          <mesh rotation={[0.72, 0.28, 0.22]}><torusGeometry args={[1.62, 0.018, 10, 128]} /><meshBasicMaterial color={VIOLET} transparent opacity={0.62} toneMapped={false} /></mesh>
-          <mesh rotation={[-0.45, 0.82, 0.1]}><torusGeometry args={[1.92, 0.012, 8, 128]} /><meshBasicMaterial color={GOLD} transparent opacity={0.5} toneMapped={false} /></mesh>
+          <mesh rotation={[Math.PI / 2, 0, 0]}><torusGeometry args={[1.35, 0.026, 12, 128]} /><meshBasicMaterial color={CYAN} transparent opacity={0.55} toneMapped /></mesh>
+          <mesh rotation={[0.72, 0.28, 0.22]}><torusGeometry args={[1.62, 0.018, 10, 128]} /><meshBasicMaterial color={VIOLET} transparent opacity={0.44} toneMapped /></mesh>
+          <mesh rotation={[-0.45, 0.82, 0.1]}><torusGeometry args={[1.92, 0.012, 8, 128]} /><meshBasicMaterial color={GOLD} transparent opacity={0.36} toneMapped /></mesh>
         </group>
       </Select>
       <mesh position={[0, -1.42, 0]}>
@@ -353,36 +357,59 @@ function EnergyCore({ onOpen }: { onOpen: () => void }) {
       </mesh>
       <mesh position={[0, -0.5, 0]} rotation={[0, 0, 0]}>
         <coneGeometry args={[1.6, 2.4, 64, 1, true]} />
-        <meshBasicMaterial color={GOLD} transparent opacity={0.035} side={THREE.DoubleSide} depthWrite={false} />
+        <meshBasicMaterial color={GOLD} transparent opacity={0.018} side={THREE.DoubleSide} depthWrite={false} />
       </mesh>
     </group>
   );
 }
 
-function World({ selected, setSelected, setView }: { selected: string[]; setSelected: Dispatch<SetStateAction<string[]>>; setView: (view: View) => void }) {
+function CameraDirector({ view }: { view: View }) {
+  const camera = useThree((state) => state.camera);
+  const lookAt = useRef(new THREE.Vector3(0, 0.25, -0.8));
+  const targets: Record<View, { position: THREE.Vector3; look: THREE.Vector3 }> = useMemo(() => ({
+    command: { position: new THREE.Vector3(0, 2.2, 13.8), look: new THREE.Vector3(0, 0.25, -0.8) },
+    bounties: { position: new THREE.Vector3(-0.4, 2.5, 14.8), look: new THREE.Vector3(1.2, 0.3, -1.4) },
+    agents: { position: new THREE.Vector3(0.9, 1.8, 11.9), look: new THREE.Vector3(4.15, 0.65, -1.05) },
+    missions: { position: new THREE.Vector3(0.6, 2.15, 10.9), look: new THREE.Vector3(5.1, 0.48, -1.05) },
+    vault: { position: new THREE.Vector3(-0.5, 2.55, 14.6), look: new THREE.Vector3(2.6, 0.2, -1.8) },
+    academy: { position: new THREE.Vector3(-0.4, 2.45, 14.5), look: new THREE.Vector3(1.5, 0.5, -1.5) },
+  }), []);
+
+  useFrame((_, delta) => {
+    const destination = targets[view];
+    const alpha = 1 - Math.exp(-delta * 1.8);
+    camera.position.lerp(destination.position, alpha);
+    lookAt.current.lerp(destination.look, alpha);
+    camera.lookAt(lookAt.current);
+  });
+  return null;
+}
+
+function World({ selected, setSelected, setView, view }: { selected: string[]; setSelected: Dispatch<SetStateAction<string[]>>; setView: (view: View) => void; view: View }) {
   const beams = useMemo(() => {
     const starts = [[2.3, 0.7, -1.1], [5.2, 0.7, -2.6], [7.65, 0.7, -0.8], [5.15, 0.7, 1.15]];
     return starts.map((point) => [new THREE.Vector3(...point as [number, number, number]), new THREE.Vector3(5.15, 0.45, -1.05)]);
   }, []);
   return (
     <>
+      <CameraDirector view={view} />
       <color attach="background" args={[INK]} />
       <fog attach="fog" args={[INK, 13, 38]} />
       <Nebula />
-      <ambientLight intensity={0.24} />
-      <hemisphereLight intensity={0.4} color="#b9e8ff" groundColor="#09020f" />
+      <ambientLight intensity={0.34} />
+      <hemisphereLight intensity={0.54} color="#b9e8ff" groundColor="#09020f" />
       <directionalLight
         position={[5, 10, 7]}
-        intensity={2.3}
+        intensity={1.45}
         color="#e4f5ff"
         castShadow
         shadow-mapSize-width={2048}
         shadow-mapSize-height={2048}
         shadow-camera-far={25}
       />
-      <pointLight position={[-4, 3, -1]} intensity={10} color={VIOLET} distance={18} />
+      <pointLight position={[-4, 3, -1]} intensity={3.5} color={VIOLET} distance={18} decay={2} />
       <Stars radius={46} depth={28} count={2100} factor={2.25} saturation={0.3} fade speed={0.22} />
-      <Sparkles count={190} scale={[24, 10, 17]} size={1.5} speed={0.28} color={CYAN} />
+      <Sparkles count={130} scale={[24, 10, 17]} size={1.15} speed={0.24} color={CYAN} />
       <Grid
         args={[40, 40]}
         position={[2.8, -0.86, -2]}
@@ -402,7 +429,7 @@ function World({ selected, setSelected, setView }: { selected: string[]; setSele
           resolution={1024}
           blur={[380, 90]}
           mixBlur={1.15}
-          mixStrength={0.62}
+          mixStrength={0.35}
           roughness={0.86}
           depthScale={0.75}
           minDepthThreshold={0.42}
@@ -427,7 +454,7 @@ function World({ selected, setSelected, setView }: { selected: string[]; setSele
       {beams.map((points, index) => (
         <Line key={agents[index].id} points={points} color={agents[index].color} lineWidth={1.1} transparent opacity={0.24} dashed dashSize={0.12} gapSize={0.09} />
       ))}
-      <ContactShadows position={[3.8, -0.88, -1.4]} scale={15} opacity={0.65} blur={2.4} far={8} color="#000000" />
+      <ContactShadows position={[3.8, -0.88, -1.4]} scale={15} opacity={0.5} blur={2.4} far={8} color="#000000" />
     </>
   );
 }
@@ -444,14 +471,14 @@ function Command({ compact, short, intent, setIntent, deploy, pending, missions,
   setView: (view: View) => void;
 }) {
   return (
-    <Container flexGrow={1} minHeight={0} flexDirection={compact ? "column" : "row"} gap={14}>
-      <Container width={compact ? "100%" : 540} flexShrink={0} flexDirection="column" gap={12} overflow={compact ? "scroll" : "visible"} scrollbarColor="#34445e">
-        <Panel gap={13} padding={compact ? 18 : 25} backgroundColor="#07101be8" borderColor="#3a4d69">
+    <Container flexGrow={1} minHeight={0} flexDirection={compact ? "column" : "row"} gap={14} overflow="hidden">
+      <Container width={compact ? "100%" : 540} flexGrow={compact ? 1 : 0} minHeight={0} flexShrink={0} flexDirection="column" gap={12} overflow={compact ? "scroll" : "hidden"} scrollbarColor="#34445e">
+        <Panel height={compact ? undefined : short ? 382 : 420} flexShrink={0} gap={13} padding={compact ? 18 : 25} backgroundColor="#07101be8" borderColor="#3a4d69">
           <Label color={GOLD}>ORBITAL COMMAND · BNB AGENT NETWORK</Label>
-          <Text fontSize={compact ? 32 : 46} lineHeight={compact ? 37 : 49} fontWeight="bold" color="#ffffff">
+          <Text fontSize={compact ? 31 : 42} lineHeight={compact ? "36px" : "47px"} fontWeight="bold" color="#ffffff">
             Deploy intelligence, not just capital.
           </Text>
-          <Text fontSize={14} lineHeight={21} color="#a4b2c6">
+          <Text fontSize={16} lineHeight="23px" color="#a4b2c6">
             Describe the outcome. A specialist squad discovers, simulates, protects, verifies, and reports every move.
           </Text>
           <Input
@@ -464,6 +491,7 @@ function Command({ compact, short, intent, setIntent, deploy, pending, missions,
             borderColor="#3d506c"
             color="#ffffff"
             selectionColor={GOLD}
+            flexShrink={0}
           />
           <Primary onClick={() => deploy()} disabled={pending}>{pending ? "ASSEMBLING SQUAD…" : "DEPLOY SQUAD  →"}</Primary>
           {!short && (
@@ -475,7 +503,7 @@ function Command({ compact, short, intent, setIntent, deploy, pending, missions,
           )}
         </Panel>
         {!short && (
-          <Panel gap={9} padding={15}>
+          <Panel height={300} flexShrink={0} gap={9} padding={15}>
             <Container flexDirection="row" justifyContent="space-between" alignItems="center">
               <Label>LIVE OPERATIONS</Label>
               <Ghost onClick={() => setView("missions")}>VIEW ALL</Ghost>
@@ -498,8 +526,8 @@ function Command({ compact, short, intent, setIntent, deploy, pending, missions,
                   <Label color={GREEN}>{`● ${mission.phase.toUpperCase()}`}</Label>
                   <Label>{mission.id}</Label>
                 </Container>
-                <Text fontSize={15} lineHeight={19} fontWeight="bold" color="#ffffff">{mission.name}</Text>
-                <Text fontSize={12} lineHeight={16} color={MUTED}>{`${mission.payout} · Enter live console`}</Text>
+                <Text fontSize={15} lineHeight="19px" fontWeight="bold" color="#ffffff">{mission.name}</Text>
+                <Text fontSize={13} lineHeight="17px" color={MUTED}>{`${mission.payout} · Enter live console`}</Text>
                 <Progress value={mission.progress} height={5} backgroundColor="#222f42" />
               </Container>
             ))}
@@ -508,17 +536,17 @@ function Command({ compact, short, intent, setIntent, deploy, pending, missions,
       </Container>
 
       {!compact && (
-        <Container flexGrow={1} minWidth={0} flexDirection="column" justifyContent="space-between" padding={18} pointerEvents="none">
-          <Container alignSelf="flex-end" width={250} flexDirection="column" gap={7}>
+        <Container flexGrow={1} minWidth={0} flexDirection="column" justifyContent="space-between" padding={18} pointerEvents="none" overflow="hidden">
+          <Container alignSelf="flex-end" width={276} height={104} flexShrink={0} flexDirection="column" gap={7}>
             <Label color={CYAN}>MISSION CORE · SYNCHRONIZED</Label>
-            <Text fontSize={20} lineHeight={24} fontWeight="bold" color="#ffffff">Squad topology live</Text>
-            <Text fontSize={12} lineHeight={17} color={MUTED}>Each beam is a verified work channel. Select any unit to inspect its role.</Text>
+            <Text fontSize={20} lineHeight="24px" fontWeight="bold" color="#ffffff">Squad topology live</Text>
+            <Text fontSize={13} lineHeight="18px" color={MUTED}>Each beam is a verified work channel. Select any unit to inspect its role.</Text>
           </Container>
-          <Container flexDirection="row" gap={8} justifyContent="flex-end" flexWrap="wrap">
+          <Container height={74} flexShrink={0} flexDirection="row" gap={8} justifyContent="flex-end">
             {agents.map((agent) => (
-              <Container key={agent.id} width={142} padding={10} gap={3} flexDirection="column" backgroundColor="#050a12d9" borderColor={`${agent.color}75`} borderWidth={1} borderRadius={7}>
+              <Container key={agent.id} width={142} height={70} flexShrink={0} padding={10} gap={4} flexDirection="column" justifyContent="center" backgroundColor="#050a12e8" borderColor={`${agent.color}75`} borderWidth={1} borderRadius={7}>
                 <Label color={agent.color}>{`${agent.role.toUpperCase()} · ${agent.score}`}</Label>
-                <Text fontSize={14} lineHeight={17} fontWeight="bold" color="#ffffff">{agent.name}</Text>
+                <Text fontSize={14} lineHeight="17px" fontWeight="bold" color="#ffffff">{agent.name}</Text>
               </Container>
             ))}
           </Container>
@@ -534,15 +562,15 @@ function Bounties({ compact, items, deploy }: { compact: boolean; items: Bounty[
       <Title compact={compact} eyebrow="BOUNTY ARENA · SEASON 04" title="Choose a real quest." description="Funded outcomes become playable operations. Every reward is guarded by evidence, permissions, and a final proof gate." />
       <Container flexDirection={compact ? "column" : "row"} gap={13} flexWrap="wrap">
         {items.map((bounty, index) => (
-          <Panel key={bounty.id} minWidth={compact ? "100%" : 270} flexGrow={1} gap={12} borderColor={index === 0 ? `${VIOLET}88` : BORDER} hover={{ borderColor: index === 0 ? VIOLET : GOLD, transformTranslateZ: 6 }}>
+          <Panel key={bounty.id} width={compact ? "100%" : 300} height={340} flexShrink={0} gap={12} borderColor={index === 0 ? `${VIOLET}88` : BORDER} hover={{ borderColor: index === 0 ? VIOLET : GOLD, transformTranslateZ: 6 }}>
             <Container flexDirection="row" justifyContent="space-between">
               <Label color={index === 0 ? VIOLET : GOLD}>{bounty.difficulty}</Label>
               <Label>{bounty.id}</Label>
             </Container>
-            <Text fontSize={21} lineHeight={26} fontWeight="bold" color="#ffffff">{bounty.title}</Text>
-            <Text fontSize={13} lineHeight={18} color={MUTED}>{`Sponsored by ${bounty.sponsor}`}</Text>
-            <Text fontSize={27} lineHeight={32} fontWeight="bold" color={GOLD}>{bounty.reward}</Text>
-            <Text fontSize={13} lineHeight={19} color="#a7b4c7">Deploy a squad, watch its work in the console, and earn after verification.</Text>
+            <Text fontSize={21} lineHeight="26px" fontWeight="bold" color="#ffffff">{bounty.title}</Text>
+            <Text fontSize={14} lineHeight="19px" color={MUTED}>{`Sponsored by ${bounty.sponsor}`}</Text>
+            <Text fontSize={27} lineHeight="32px" fontWeight="bold" color={GOLD}>{bounty.reward}</Text>
+            <Text fontSize={14} lineHeight="20px" color="#a7b4c7">Deploy a squad, watch its work in the console, and earn after verification.</Text>
             <Primary onClick={() => deploy(bounty.title)}>ACCEPT & ENTER CONSOLE →</Primary>
           </Panel>
         ))}
@@ -561,8 +589,9 @@ function Agents({ compact, selected, setSelected, setView }: { compact: boolean;
           return (
             <Panel
               key={agent.id}
-              minWidth={compact ? "100%" : 225}
-              flexGrow={1}
+              width={compact ? "100%" : 250}
+              height={228}
+              flexShrink={0}
               gap={8}
               cursor="pointer"
               onClick={() => setSelected((list) => list.includes(agent.id) ? list.filter((id) => id !== agent.id) : [...list, agent.id])}
@@ -571,12 +600,12 @@ function Agents({ compact, selected, setSelected, setView }: { compact: boolean;
               hover={{ transformTranslateZ: 6, borderColor: agent.color }}
             >
               <Container width={52} height={52} borderRadius={12} alignItems="center" justifyContent="center" backgroundColor={`${agent.color}20`} borderColor={agent.color} borderWidth={1}>
-                <Text fontSize={24} lineHeight={28} color={agent.color}>◇</Text>
+                <Text fontSize={24} lineHeight="28px" color={agent.color}>◇</Text>
               </Container>
               <Label color={agent.color}>{`${chosen ? "SELECTED" : "READY"} · RATING ${agent.score}`}</Label>
-              <Text fontSize={22} lineHeight={26} fontWeight="bold" color="#ffffff">{agent.name}</Text>
-              <Text fontSize={13} lineHeight={18} color="#d2d9e5">{agent.role}</Text>
-              <Text fontSize={12} lineHeight={17} color={MUTED}>{agent.specialty}</Text>
+              <Text fontSize={22} lineHeight="26px" fontWeight="bold" color="#ffffff">{agent.name}</Text>
+              <Text fontSize={14} lineHeight="19px" color="#d2d9e5">{agent.role}</Text>
+              <Text fontSize={13} lineHeight="18px" color={MUTED}>{agent.specialty}</Text>
             </Panel>
           );
         })}
@@ -584,7 +613,7 @@ function Agents({ compact, selected, setSelected, setView }: { compact: boolean;
       <Panel flexDirection={compact ? "column" : "row"} alignItems={compact ? "stretch" : "center"} gap={12}>
         <Container flexGrow={1} flexDirection="column" gap={4}>
           <Label color={selected.length >= 3 ? GREEN : MUTED}>{`${selected.length} SPECIALISTS SELECTED`}</Label>
-          <Text fontSize={14} lineHeight={18} color="#ffffff">{selected.length >= 3 ? "Squad coverage is ready." : "Choose at least three complementary roles."}</Text>
+          <Text fontSize={14} lineHeight="18px" color="#ffffff">{selected.length >= 3 ? "Squad coverage is ready." : "Choose at least three complementary roles."}</Text>
         </Container>
         <Primary disabled={selected.length < 3} onClick={() => setView("command")}>USE THIS SQUAD</Primary>
       </Panel>
@@ -617,7 +646,7 @@ function MissionRoom({ compact, mission, running, setRunning }: { compact: boole
         <Metric label="REWARD RESERVED" value={mission.payout} detail="Released after proof" color={GOLD} />
         <Metric label="SAFETY LIMITS" value="ALL SAFE" detail="Read · simulate · propose" color={GREEN} />
       </Container>
-      <Panel flexGrow={1} minHeight={285} gap={12} justifyContent="center" backgroundColor="#07101be8">
+      <Panel flexGrow={1} minHeight={310} gap={12} justifyContent="center" backgroundColor="#07101be8">
         <Container flexDirection="row" justifyContent="space-between">
           <Label color={running ? GREEN : GOLD}>{running ? "● SQUAD STREAMING" : "Ⅱ SQUAD PAUSED"}</Label>
           <Label>{phase.toUpperCase()}</Label>
@@ -629,10 +658,10 @@ function MissionRoom({ compact, mission, running, setRunning }: { compact: boole
           return (
             <Container key={name} flexDirection="row" alignItems="center" gap={11} padding={12} backgroundColor={index === current ? `${color}18` : "#101925d9"} borderColor={index === current ? color : "#2a394e"} borderWidth={1} borderRadius={8}>
               <Container width={32} height={32} borderRadius={16} alignItems="center" justifyContent="center" backgroundColor={`${color}22`}>
-                <Text color={color} fontSize={15} lineHeight={18}>◇</Text>
+                <Text color={color} fontSize={15} lineHeight="18px">◇</Text>
               </Container>
-              <Text width={82} fontSize={13} lineHeight={17} fontWeight="bold" color={color}>{name}</Text>
-              <Text flexGrow={1} fontSize={13} lineHeight={18} color="#c0cad8">{action}</Text>
+              <Text width={82} fontSize={13} lineHeight="17px" fontWeight="bold" color={color}>{name}</Text>
+              <Text flexGrow={1} fontSize={14} lineHeight="19px" color="#c0cad8">{action}</Text>
               <Label color={index <= current ? GREEN : MUTED}>{status}</Label>
             </Container>
           );
@@ -649,17 +678,17 @@ function Vault({ compact, wallet, connect, technical, setTechnical }: { compact:
       <Container flexDirection={compact ? "column" : "row"} gap={12}>
         <Panel flexGrow={1} gap={13}>
           <Label>CONNECTED WALLET</Label>
-          <Text fontSize={compact ? 24 : 34} lineHeight={compact ? 29 : 39} fontWeight="bold" color="#ffffff">{wallet || "Not connected"}</Text>
-          <Text fontSize={13} lineHeight={18} color={MUTED}>{wallet ? "BNB Smart Chain Testnet · ready" : "Connect to inspect and approve settlements."}</Text>
+          <Text fontSize={compact ? 24 : 34} lineHeight={compact ? "29px" : "39px"} fontWeight="bold" color="#ffffff">{wallet || "Not connected"}</Text>
+          <Text fontSize={14} lineHeight="19px" color={MUTED}>{wallet ? "BNB Smart Chain Testnet · ready" : "Connect to inspect and approve settlements."}</Text>
           <Primary onClick={connect}>{wallet ? "WALLET CONNECTED" : "CONNECT WALLET"}</Primary>
         </Panel>
         <Panel flexGrow={1} gap={11}>
           <Label color={GREEN}>ACTIVE MANDATE · SAFE</Label>
-          <Text fontSize={23} lineHeight={27} fontWeight="bold" color="#ffffff">Liquidity Intelligence</Text>
+          <Text fontSize={23} lineHeight="27px" fontWeight="bold" color="#ffffff">Liquidity Intelligence</Text>
           {[["Allowed", "Read · Simulate · Propose"], ["Budget", "1,200 / 1,500 USDT"], ["Expires", "47h 18m"], ["Approval", "Every transaction"]].map(([label, value]) => (
             <Container key={label} flexDirection="row" justifyContent="space-between" paddingY={5}>
-              <Text fontSize={13} lineHeight={17} color={MUTED}>{label}</Text>
-              <Text fontSize={13} lineHeight={17} fontWeight="bold" color="#dce6f3">{value}</Text>
+              <Text fontSize={14} lineHeight="18px" color={MUTED}>{label}</Text>
+              <Text fontSize={14} lineHeight="18px" fontWeight="bold" color="#dce6f3">{value}</Text>
             </Container>
           ))}
         </Panel>
@@ -668,7 +697,7 @@ function Vault({ compact, wallet, connect, technical, setTechnical }: { compact:
         <Container flexDirection={compact ? "column" : "row"} alignItems={compact ? "stretch" : "center"} justifyContent="space-between" gap={8}>
           <Container flexDirection="column" gap={4}>
             <Label>TECHNICAL LENS</Label>
-            <Text fontSize={13} lineHeight={18} color="#ffffff">Reveal the protocol beneath the plain-language controls.</Text>
+            <Text fontSize={14} lineHeight="19px" color="#ffffff">Reveal the protocol beneath the plain-language controls.</Text>
           </Container>
           <Ghost active={technical} onClick={() => setTechnical(!technical)}>{technical ? "TECH ON" : "TECH OFF"}</Ghost>
         </Container>
@@ -699,11 +728,11 @@ function Academy({ compact }: { compact: boolean }) {
         {steps.map(([number, title, copy]) => (
           <Container key={number} flexDirection="row" gap={13} alignItems="center" padding={13} backgroundColor="#101925dc" borderRadius={8}>
             <Container width={36} height={36} borderRadius={18} flexShrink={0} alignItems="center" justifyContent="center" backgroundColor="#f3ba2f20" borderColor={GOLD} borderWidth={1}>
-              <Text fontSize={14} lineHeight={18} color={GOLD} fontWeight="bold">{number}</Text>
+              <Text fontSize={14} lineHeight="18px" color={GOLD} fontWeight="bold">{number}</Text>
             </Container>
             <Container flexDirection="column" gap={4}>
-              <Text fontSize={16} lineHeight={20} fontWeight="bold" color="#ffffff">{title}</Text>
-              <Text fontSize={13} lineHeight={18} color={MUTED}>{copy}</Text>
+              <Text fontSize={16} lineHeight="20px" fontWeight="bold" color="#ffffff">{title}</Text>
+              <Text fontSize={14} lineHeight="19px" color={MUTED}>{copy}</Text>
             </Container>
           </Container>
         ))}
@@ -716,7 +745,7 @@ function Hud() {
   const width = useThree((state) => state.size.width);
   const height = useThree((state) => state.size.height);
   const compact = width < 920;
-  const short = height < 790;
+  const short = height < 875;
   const [view, setView] = useState<View>("command");
   const [intent, setIntent] = useState("Map the safest BNB liquidity routes");
   const [pending, setPending] = useState(false);
@@ -761,7 +790,12 @@ function Hud() {
   const deploy = async (override?: string) => {
     const objective = override || intent || "Agent squad mission";
     setPending(true);
-    let mission: Mission = { id: `M-${Date.now().toString().slice(-4)}`, name: objective, phase: "Execution", progress: 5, payout: "1,200 USDT" };
+    const optimisticMission: Mission = { id: `M-${Date.now().toString().slice(-4)}`, name: objective, phase: "Execution", progress: 5, payout: "1,200 USDT" };
+    let mission = optimisticMission;
+    setActiveMission(optimisticMission);
+    setMissions((list) => [optimisticMission, ...list]);
+    setRunning(true);
+    setView("missions");
     try {
       const response = await fetch("/api/state", {
         method: "POST",
@@ -784,10 +818,8 @@ function Hud() {
       // The command layer remains operable if the runtime API is unavailable.
     }
     setActiveMission(mission);
-    setMissions((list) => [mission, ...list.filter((item) => item.id !== mission.id)]);
+    setMissions((list) => [mission, ...list.filter((item) => item.id !== optimisticMission.id && item.id !== mission.id)]);
     setPending(false);
-    setRunning(true);
-    setView("missions");
   };
 
   const connect = async () => {
@@ -826,8 +858,14 @@ function Hud() {
 
   return (
     <Selection>
-      <World selected={selected} setSelected={setSelected} setView={setView} />
-      <Fullscreen attachCamera flexDirection="column" padding={compact ? 9 : 16} gap={10} color="#ffffff" fontFamily="inter">
+      <World selected={selected} setSelected={setSelected} setView={setView} view={view} />
+      <EffectComposer multisampling={4} enableNormalPass={false}>
+        <SelectiveBloom intensity={0.72} luminanceThreshold={0.72} luminanceSmoothing={0.42} mipmapBlur />
+        <Vignette eskil={false} offset={0.2} darkness={0.3} blendFunction={BlendFunction.NORMAL} />
+      </EffectComposer>
+      <DreiHud renderPriority={2}>
+        <OrthographicCamera makeDefault position={[0, 0, 1000]} near={0.1} far={2000} />
+        <Fullscreen attachCamera flexDirection="column" padding={compact ? 9 : 16} gap={10} color="#ffffff" overflow="hidden">
         <Container
           height={64}
           flexShrink={0}
@@ -840,15 +878,15 @@ function Hud() {
           borderWidth={1}
           borderRadius={10}
         >
-          <Container width={38} height={38} borderRadius={9} backgroundColor="#f3ba2f20" borderColor={GOLD} borderWidth={1} alignItems="center" justifyContent="center">
-            <Text color={GOLD} fontSize={19} lineHeight={23}>◆</Text>
+          <Container width={38} height={38} flexShrink={0} borderRadius={9} backgroundColor="#f3ba2f20" borderColor={GOLD} borderWidth={1} alignItems="center" justifyContent="center">
+            <Text color={GOLD} fontSize={19} lineHeight="23px">◆</Text>
           </Container>
-          <Container flexDirection="column" gap={1}>
-            <Text fontSize={17} lineHeight={20} fontWeight="bold" letterSpacing={0.6} color="#ffffff">BINANCEFF2</Text>
-            <Text fontSize={10} lineHeight={13} letterSpacing={1.8} color={MUTED}>ORBITAL COMMAND</Text>
+          <Container width={210} height={40} flexShrink={0} flexDirection="column" justifyContent="center" gap={1}>
+            <Text fontSize={17} lineHeight="20px" fontWeight="bold" letterSpacing={0.6} color="#ffffff">BINANCEFF2</Text>
+            <Text fontSize={12} lineHeight="14px" letterSpacing={1.45} color={MUTED}>ORBITAL COMMAND</Text>
           </Container>
           <Container flexGrow={1} />
-          {!compact && <Label color={GREEN}>● BNB NETWORK ONLINE · 142 UNITS</Label>}
+          {!compact && <Container width={285} alignItems="flex-end"><Label color={GREEN}>● BNB NETWORK ONLINE · 142 UNITS</Label></Container>}
           <Ghost onClick={() => { window.location.href = "/"; }}>V1 ↗</Ghost>
         </Container>
 
@@ -862,11 +900,12 @@ function Hud() {
 
         <Container flexGrow={1} minHeight={0} flexDirection="row" gap={11}>
           {!compact && (
-            <Container width={196} flexShrink={0} flexDirection="column" gap={7} padding={10} backgroundColor="#050a12e8" borderColor={BORDER} borderWidth={1} borderRadius={10}>
+            <Container width={196} flexShrink={0} flexDirection="column" gap={7} padding={10} backgroundColor="#050a12e8" borderColor={BORDER} borderWidth={1} borderRadius={10} overflow="hidden">
               {navigation.map(([id, label, glyph]) => (
                 <Container
                   key={id}
                   height={45}
+                  flexShrink={0}
                   flexDirection="row"
                   alignItems="center"
                   gap={10}
@@ -879,19 +918,19 @@ function Hud() {
                   hover={{ backgroundColor: "#152239", transformTranslateZ: 4 }}
                   onClick={() => setView(id)}
                 >
-                  <Text width={20} textAlign="center" fontSize={16} lineHeight={20} color={view === id ? GOLD : "#7f91a9"}>{glyph}</Text>
-                  <Text fontSize={12} lineHeight={15} fontWeight="bold" letterSpacing={0.85} color={view === id ? "#ffffff" : "#92a1b5"}>{label}</Text>
+                  <Text width={20} textAlign="center" fontSize={16} lineHeight="20px" color={view === id ? GOLD : "#7f91a9"}>{glyph}</Text>
+                  <Text fontSize={14} lineHeight="17px" fontWeight="bold" letterSpacing={0.65} color={view === id ? "#ffffff" : "#92a1b5"}>{label}</Text>
                 </Container>
               ))}
               <Container flexGrow={1} />
-              <Panel padding={12} gap={5} backgroundColor="#0a151cee" borderColor="#285145">
+              <Panel height={122} flexShrink={0} padding={12} gap={7} backgroundColor="#0a151cee" borderColor="#285145">
                 <Label color={GREEN}>MANDATE · SAFE</Label>
-                <Text fontSize={12} lineHeight={17} color="#b1becc">Agents can read, test, and propose. You approve money movement.</Text>
+                <Text fontSize={13} lineHeight="18px" color="#b1becc">Agents can read, test, and propose. You approve money movement.</Text>
               </Panel>
             </Container>
           )}
 
-          <Container flexGrow={1} minWidth={0} padding={compact ? 1 : 7}>
+          <Container flexGrow={1} minWidth={0} minHeight={0} padding={compact ? 1 : 7} overflow="hidden">
             {view === "command" && <Command compact={compact} short={short} intent={intent} setIntent={setIntent} deploy={deploy} pending={pending} missions={missions} openMission={openMission} setView={setView} />}
             {view === "bounties" && <Bounties compact={compact} items={bounties} deploy={deploy} />}
             {view === "agents" && <Agents compact={compact} selected={selected} setSelected={setSelected} setView={setView} />}
@@ -907,11 +946,8 @@ function Hud() {
             <Label color={GOLD}>ALT + 3 · SPATIAL LAYER</Label>
           </Container>
         )}
-      </Fullscreen>
-      <EffectComposer multisampling={4} enableNormalPass={false}>
-        <SelectiveBloom intensity={2.25} luminanceThreshold={0.32} luminanceSmoothing={0.32} mipmapBlur />
-        <Vignette eskil={false} offset={0.13} darkness={0.72} blendFunction={BlendFunction.NORMAL} />
-      </EffectComposer>
+        </Fullscreen>
+      </DreiHud>
     </Selection>
   );
 }
@@ -927,7 +963,7 @@ export function SpatialInterface() {
         onCreated={({ gl }) => {
           gl.outputColorSpace = THREE.SRGBColorSpace;
           gl.toneMapping = THREE.ACESFilmicToneMapping;
-          gl.toneMappingExposure = 1.08;
+          gl.toneMappingExposure = 0.92;
           gl.shadowMap.enabled = true;
           gl.shadowMap.type = THREE.PCFSoftShadowMap;
         }}
