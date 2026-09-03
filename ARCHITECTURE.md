@@ -1,5 +1,11 @@
 # Arquitectura
 
+## Runtime implementado
+
+La UI React/Vinext consume route handlers autenticados. Los handlers persisten estado de producto y eventos append-only en D1. `lib/bnb-agent.ts` es el límite de protocolo: consulta el registro del SDK oficial y genera planes de ejecución acotados. La wallet EIP-1193 vive exclusivamente en el navegador.
+
+ERC-8004 aporta identidad de agentes y ERC-8183 aporta commerce, escrow y evaluación mediante `@bnbagent/sdk`. `EconomicMandate.sol` agrega límites específicos de selector, presupuesto, caducidad y revocación. `BountyEscrow.sol` cubre flujos independientes que no usen ERC-8183.
+
 ## Capas
 
 1. **Experience:** portal web/mobile, marketplace, bounties, tutor y salas de ejecución.
@@ -50,4 +56,3 @@ Cada autorización contiene: principal, agente, acciones permitidas, activos, mo
 - Firmas tipadas, nonces y expiración.
 - Logs append-only y correlación entre tarea, mandato y transacción.
 - Verificación independiente; el ejecutor no aprueba su propio pago.
-

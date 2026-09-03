@@ -38,3 +38,14 @@ export const auditEvents = sqliteTable("audit_events", {
   id:integer("id").primaryKey({autoIncrement:true}), actorId:text("actor_id").notNull().references(()=>users.id), entityType:text("entity_type").notNull(), entityId:text("entity_id").notNull(),
   action:text("action").notNull(), payloadJson:text("payload_json").notNull().default("{}"), createdAt:integer("created_at",{mode:"timestamp"}).notNull().$defaultFn(()=>new Date()),
 });
+
+export const taskPlans = sqliteTable("task_plans", {
+  id:integer("id").primaryKey({autoIncrement:true}), ownerId:text("owner_id").notNull().references(()=>users.id), missionId:integer("mission_id").references(()=>missions.id),
+  intent:text("intent").notNull(), status:text("status").notNull().default("READY"), stepsJson:text("steps_json").notNull(), squadJson:text("squad_json").notNull(),
+  riskJson:text("risk_json").notNull(), protocol:text("protocol").notNull().default("ERC-8183"), createdAt:integer("created_at",{mode:"timestamp"}).notNull().$defaultFn(()=>new Date()),
+});
+
+export const evidence = sqliteTable("evidence", {
+  id:integer("id").primaryKey({autoIncrement:true}), ownerId:text("owner_id").notNull().references(()=>users.id), missionId:integer("mission_id").notNull().references(()=>missions.id),
+  kind:text("kind").notNull(), uri:text("uri").notNull(), digest:text("digest").notNull(), status:text("status").notNull().default("PENDING"), createdAt:integer("created_at",{mode:"timestamp"}).notNull().$defaultFn(()=>new Date()),
+});
