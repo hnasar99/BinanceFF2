@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Activity,
   ArrowRight,
@@ -365,6 +365,14 @@ function Header({
         <b>{title.toUpperCase()}</b>
       </div>
       <div className="top-actions">
+        <a
+          className="spatial-entry"
+          href="/spatial"
+          title="Enter spatial interface (Alt + 3)"
+          aria-label="Enter 3D spatial interface"
+        >
+          3D
+        </a>
         <label>
           <Search />
           <input aria-label="Search" placeholder="Search agents, bounties..." />
@@ -1325,6 +1333,16 @@ export default function Home() {
     () => nav.find((x) => x[0] === active)?.[2] || "Command",
     [active],
   );
+  useEffect(() => {
+    const openSpatial = (event: KeyboardEvent) => {
+      if (event.altKey && (event.code === "Digit3" || event.key === "3")) {
+        event.preventDefault();
+        window.location.assign("/spatial");
+      }
+    };
+    window.addEventListener("keydown", openSpatial);
+    return () => window.removeEventListener("keydown", openSpatial);
+  }, []);
   return (
     <main className="app-shell">
       <Sidebar

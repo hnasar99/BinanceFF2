@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   Activity,
-  Bot,
   Check,
   ChevronLeft,
   CirclePause,
@@ -93,7 +92,7 @@ export function MissionConsole({
         <div>
           <span className="eyebrow">
             {mission.kind === "bounty" ? "BOUNTY ACCEPTED" : "ACTIVE MISSION"}{" "}
-            // {mission.difficulty || "ELITE"}
+            {`// ${mission.difficulty || "ELITE"}`}
           </span>
           <h1>{mission.title}</h1>
           <p>
