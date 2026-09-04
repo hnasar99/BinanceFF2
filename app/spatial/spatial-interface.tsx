@@ -12,9 +12,13 @@ import {
   Sparkles,
   Stars,
 } from "@react-three/drei";
-import { Container, Fullscreen, Text } from "@react-three/uikit";
+import { canvasInputProps, Container, Fullscreen, Text } from "@react-three/uikit";
 import { Button, Input, Progress } from "@react-three/uikit-default";
+import type { VanillaInput } from "@react-three/uikit-default";
 import { ListCard, ListRow, ScrollList, press, useHudMetrics } from "./hud-kit";
+import { GameAudioProvider, useGameAudio } from "./game-audio";
+import { SpatialI18nProvider, useSpatialI18n } from "./i18n-context";
+import { languages, translate, type Locale } from "./i18n";
 import {
   EffectComposer,
   Select,
@@ -23,7 +27,7 @@ import {
   Vignette,
 } from "@react-three/postprocessing";
 import { BlendFunction } from "postprocessing";
-import { Suspense, memo, useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ComponentProps, Dispatch, ReactNode, SetStateAction } from "react";
 import * as THREE from "three";
 
@@ -138,31 +142,35 @@ function WorldLabel({
 
 function Primary({ children, onClick, disabled = false }: { children: ReactNode; onClick: () => void; disabled?: boolean }) {
   const { s } = useHudMetrics();
+  const audio = useGameAudio();
   return (
     <Button
       height={s(46)}
       disabled={disabled}
-      onClick={press(() => { if (!disabled) onClick(); })}
+      onClick={press(() => { if (!disabled) { audio.click(); onClick(); } })}
+      onHoverChange={(hovered) => { if (hovered) audio.hover(); }}
       backgroundColor={GOLD}
       color="#07080b"
       borderRadius={7}
       pointerEvents="auto"
       pointerEventsOrder={20}
       cursor="pointer"
-      hover={{ backgroundColor: "#ffd665", transformScale: 1.015 }}
-      active={{ transformScale: 0.98 }}
+      hover={{ backgroundColor: "#ffe07f", transformScale: 1.022, transformTranslateZ: 8 }}
+      active={{ transformScale: 0.965, backgroundColor: "#dca71e" }}
     >
       <Text fontSize={s(14)} lineHeight={`${s(17)}px`} fontWeight="bold" letterSpacing={0.55}>{children}</Text>
     </Button>
   );
 }
 
-function Ghost({ children, onClick, active = false }: { children: ReactNode; onClick: () => void; active?: boolean }) {
+function Ghost({ children, onClick, active = false, sound = true }: { children: ReactNode; onClick: () => void; active?: boolean; sound?: boolean }) {
   const { s } = useHudMetrics();
+  const audio = useGameAudio();
   return (
     <Button
       height={s(40)}
-      onClick={press(onClick)}
+      onClick={press(() => { if (sound) audio.click(); onClick(); })}
+      onHoverChange={(hovered) => { if (hovered && sound) audio.hover(); }}
       variant="outline"
       backgroundColor={active ? "#f3ba2f25" : "#09101bdd"}
       borderColor={active ? GOLD : BORDER}
@@ -171,11 +179,75 @@ function Ghost({ children, onClick, active = false }: { children: ReactNode; onC
       pointerEvents="auto"
       pointerEventsOrder={20}
       cursor="pointer"
-      hover={{ backgroundColor: "#16243a", color: "#ffffff" }}
-      active={{ transformScale: 0.98 }}
+      hover={{ backgroundColor: "#1b2d48", color: "#ffffff", borderColor: CYAN, transformTranslateZ: 6 }}
+      active={{ transformScale: 0.965, backgroundColor: "#0e1929" }}
     >
       <Text fontSize={s(13)} lineHeight={`${s(16)}px`} fontWeight="bold" letterSpacing={0.4}>{children}</Text>
     </Button>
+  );
+}
+
+function Flag({ locale }: { locale: Locale }) {
+  if (locale === "es") {
+    return (
+      <Container width={22} height={14} flexShrink={0} flexDirection="column" overflow="hidden" borderRadius={2} borderWidth={1} borderColor="#ffffff55">
+        <Container height={4} backgroundColor="#aa151b" />
+        <Container flexGrow={1} backgroundColor="#f1bf00" />
+        <Container height={4} backgroundColor="#aa151b" />
+      </Container>
+    );
+  }
+  if (locale === "pt") {
+    return (
+      <Container width={22} height={14} flexShrink={0} alignItems="center" justifyContent="center" overflow="hidden" borderRadius={2} borderWidth={1} borderColor="#ffffff55" backgroundColor="#009b3a">
+        <Container width={9} height={9} transformRotateZ={45} alignItems="center" justifyContent="center" backgroundColor="#ffdf00">
+          <Container width={5} height={5} borderRadius={3} backgroundColor="#002776" />
+        </Container>
+      </Container>
+    );
+  }
+  return (
+    <Container width={22} height={14} flexShrink={0} flexDirection="column" justifyContent="center" overflow="hidden" borderRadius={2} borderWidth={1} borderColor="#ffffff55" backgroundColor="#163a70">
+      <Container height={4} backgroundColor="#ffffff" justifyContent="center"><Container height={2} backgroundColor="#c8102e" /></Container>
+    </Container>
+  );
+}
+
+function LanguageSelector({ onSelect, phone }: { onSelect: (locale: Locale) => void; phone: boolean }) {
+  const { locale } = useSpatialI18n();
+  const audio = useGameAudio();
+  return (
+    <Container height={40} flexShrink={0} flexDirection="row" gap={3} padding={3} backgroundColor="#07101bdd" borderColor={BORDER} borderWidth={1} borderRadius={7}>
+      {languages.map((language) => {
+        const active = locale === language.id;
+        return (
+          <Container
+            key={language.id}
+            width={phone ? 34 : 52}
+            height={32}
+            flexShrink={0}
+            flexDirection="row"
+            alignItems="center"
+            justifyContent="center"
+            gap={5}
+            cursor="pointer"
+            pointerEvents="auto"
+            pointerEventsOrder={30}
+            borderRadius={5}
+            borderWidth={1}
+            borderColor={active ? GOLD : "#00000000"}
+            backgroundColor={active ? "#f3ba2f22" : "#00000000"}
+            hover={{ backgroundColor: "#1b2d48", borderColor: CYAN, transformTranslateZ: 5 }}
+            active={{ transformScale: 0.94 }}
+            onHoverChange={(hovered) => { if (hovered) audio.hover(); }}
+            onClick={press(() => { audio.click(); onSelect(language.id); })}
+          >
+            <Flag locale={language.id} />
+            {!phone && <Text fontSize={11} lineHeight="14px" fontWeight="bold" color={active ? GOLD : "#b9c5d6"}>{language.short}</Text>}
+          </Container>
+        );
+      })}
+    </Container>
   );
 }
 
@@ -277,6 +349,7 @@ function RobotAgent({
   onSelect: () => void;
   onHover: (active: boolean) => void;
 }) {
+  const { t } = useSpatialI18n();
   const group = useRef<THREE.Group>(null);
   const halo = useRef<THREE.Group>(null);
   const positions: Array<[number, number, number]> = [
@@ -387,7 +460,7 @@ function RobotAgent({
       </mesh>
       {showLabel && (
         <group position={[0, 2.32, 0]}>
-          <WorldLabel color={agent.color} active={lit}>{`${agent.name} · ${agent.role.toUpperCase()}`}</WorldLabel>
+          <WorldLabel color={agent.color} active={lit}>{`${agent.name} · ${t(agent.role).toUpperCase()}`}</WorldLabel>
         </group>
       )}
     </group>
@@ -395,6 +468,7 @@ function RobotAgent({
 }
 
 function EnergyCore({ hovered, pickable, showLabel, onOpen, onHover }: { hovered: boolean; pickable: boolean; showLabel: boolean; onOpen: () => void; onHover: (active: boolean) => void }) {
+  const { t } = useSpatialI18n();
   const core = useRef<THREE.Group>(null);
   const rings = useRef<THREE.Group>(null);
   useFrame(({ clock }, delta) => {
@@ -440,10 +514,39 @@ function EnergyCore({ hovered, pickable, showLabel, onOpen, onHover }: { hovered
       </mesh>
       {showLabel && (
         <group position={[0, 2.15, 0]}>
-          <WorldLabel color={GOLD} width={168} active={hovered}>MISSION CORE</WorldLabel>
+          <WorldLabel color={GOLD} width={168} active={hovered}>{t("MISSION CORE")}</WorldLabel>
         </group>
       )}
     </group>
+  );
+}
+
+function WarpBurst({ nonce }: { nonce: number }) {
+  const group = useRef<THREE.Group>(null);
+  const elapsed = useRef(0);
+  useFrame((_, delta) => {
+    if (!group.current || nonce === 0) return;
+    elapsed.current += delta;
+    const progress = Math.min(1, elapsed.current / 1.45);
+    group.current.visible = progress < 1;
+    group.current.scale.setScalar(0.45 + progress * 3.6);
+    group.current.rotation.x += delta * 0.62;
+    group.current.rotation.y -= delta * 0.48;
+    group.current.traverse((child) => {
+      const material = (child as THREE.Mesh).material;
+      if (material && !Array.isArray(material) && "opacity" in material) material.opacity = Math.max(0, (1 - progress) * 0.72);
+    });
+  });
+  if (nonce === 0) return null;
+  return (
+    <Select enabled>
+      <group ref={group} position={[5.15, 0.45, -1.05]}>
+        <mesh rotation={[Math.PI / 2, 0, 0]}><torusGeometry args={[1.05, 0.026, 12, 128]} /><meshBasicMaterial color={CYAN} transparent opacity={0.7} toneMapped={false} depthWrite={false} /></mesh>
+        <mesh rotation={[0.85, 0.2, 0.3]}><torusGeometry args={[1.28, 0.018, 10, 128]} /><meshBasicMaterial color={VIOLET} transparent opacity={0.62} toneMapped={false} depthWrite={false} /></mesh>
+        <mesh rotation={[-0.4, 0.75, 0.1]}><icosahedronGeometry args={[0.88, 2]} /><meshBasicMaterial color={GOLD} wireframe transparent opacity={0.46} toneMapped={false} depthWrite={false} /></mesh>
+        <pointLight color={CYAN} intensity={4.2} distance={8} decay={2} />
+      </group>
+    </Select>
   );
 }
 
@@ -482,6 +585,7 @@ function CameraDirector({ view, compact }: { view: View; compact: boolean }) {
 }
 
 function World({
+  deployFx,
   selected,
   hovered,
   compact,
@@ -490,6 +594,7 @@ function World({
   setView,
   view,
 }: {
+  deployFx: number;
   selected: string[];
   hovered: string | null;
   compact: boolean;
@@ -557,6 +662,7 @@ function World({
         onOpen={() => setView("missions")}
         onHover={(active) => setHovered(active ? "core" : null)}
       />
+      <WarpBurst key={deployFx} nonce={deployFx} />
       {agents.map((agent, index) => (
         <RobotAgent
           key={agent.id}
@@ -581,7 +687,7 @@ function World({
   );
 }
 
-function Command({ compact, phone, short, intent, setIntent, deploy, pending, missions, openMission, setView, hovered, selected, setSelected }: {
+function Command({ compact, phone, short, intent, setIntent, deploy, pending, missions, openMission, setView, hovered, selected, setSelected, registerIntentInput }: {
   compact: boolean;
   phone: boolean;
   short: boolean;
@@ -595,38 +701,51 @@ function Command({ compact, phone, short, intent, setIntent, deploy, pending, mi
   hovered: string | null;
   selected: string[];
   setSelected: Dispatch<SetStateAction<string[]>>;
+  registerIntentInput: (input: VanillaInput | null) => void;
 }) {
+  const { t } = useSpatialI18n();
+  const audio = useGameAudio();
+  const [intentFocused, setIntentFocused] = useState(false);
   return (
     <Container width="100%" flexDirection={compact ? "column" : "row"} gap={phone ? 10 : 14}>
       <Container width={compact ? "100%" : 540} flexDirection="column" gap={phone ? 8 : 12} flexShrink={0}>
         <Panel flexShrink={0} gap={phone ? 9 : 13} padding={phone ? 14 : compact ? 18 : 25} backgroundColor="#07101be8" borderColor="#3a4d69">
-          <Label color={GOLD}>{phone ? "ORBITAL COMMAND" : "ORBITAL COMMAND · BNB AGENT NETWORK"}</Label>
+          <Label color={GOLD}>{t(phone ? "ORBITAL COMMAND" : "ORBITAL COMMAND · BNB AGENT NETWORK")}</Label>
           <Text fontSize={phone ? 24 : compact ? 30 : 40} lineHeight={phone ? "28px" : compact ? "34px" : "44px"} fontWeight="bold" color="#ffffff" wordBreak="break-word">
-            Deploy intelligence, not just capital.
+            {t("Deploy intelligence, not just capital.")}
           </Text>
           {!phone && (
             <Text fontSize={16} lineHeight="23px" color="#a4b2c6">
-              Describe the outcome. A specialist squad discovers, simulates, protects, verifies, and reports every move.
+              {t("Describe the outcome. A specialist squad discovers, simulates, protects, verifies, and reports every move.")}
             </Text>
           )}
           <Input
+            ref={registerIntentInput}
             value={intent}
             onValueChange={setIntent}
-            placeholder="Example: find the safest BNB liquidity route"
+            onFocusChange={(focused) => { setIntentFocused(focused); if (focused) audio.click(); }}
+            placeholder={t("Example: find the safest BNB liquidity route")}
             width="100%"
             height={48}
-            backgroundColor="#030812f2"
-            borderColor="#3d506c"
+            backgroundColor={intentFocused ? "#081526f8" : "#030812f2"}
+            borderColor={intentFocused ? CYAN : "#3d506c"}
+            borderWidth={intentFocused ? 2 : 1}
             color="#ffffff"
             selectionColor={GOLD}
             flexShrink={0}
             pointerEvents="auto"
             pointerEventsOrder={20}
+            tabIndex={0}
+            autocomplete="off"
           />
-          <Primary onClick={() => deploy()} disabled={pending}>{pending ? "ASSEMBLING SQUAD…" : "DEPLOY SQUAD  →"}</Primary>
+          <Container flexDirection="row" alignItems="center" justifyContent="space-between" gap={8} flexShrink={0}>
+            <Label color={intentFocused ? GREEN : MUTED}>{t(intentFocused ? "● COMMAND CHANNEL OPEN · TYPE NOW" : "/ FOCUS INPUT · ENTER DEPLOY")}</Label>
+            {!phone && <Label color={intent.trim() ? CYAN : MUTED}>{`${intent.length} ${t("CHARS")}`}</Label>}
+          </Container>
+          <Primary onClick={() => deploy()} disabled={pending}>{t(pending ? "ASSEMBLING SQUAD…" : "DEPLOY SQUAD  →")}</Primary>
           <Container flexDirection="row" gap={7} flexWrap="wrap">
             {["Scan liquidity", "Audit a contract", "Launch a bounty"].map((item) => (
-              <Ghost key={item} onClick={() => setIntent(item)}>{item}</Ghost>
+              <Ghost key={item} onClick={() => setIntent(t(item))}>{t(item)}</Ghost>
             ))}
           </Container>
         </Panel>
@@ -654,7 +773,7 @@ function Command({ compact, phone, short, intent, setIntent, deploy, pending, mi
                   setView("agents");
                 })}
               >
-                <Label color={agent.color}>{agent.role.toUpperCase()}</Label>
+                <Label color={agent.color}>{t(agent.role).toUpperCase()}</Label>
                 <Text fontSize={13} lineHeight="16px" fontWeight="bold" color="#ffffff">{agent.name}</Text>
               </Container>
             ))}
@@ -663,8 +782,8 @@ function Command({ compact, phone, short, intent, setIntent, deploy, pending, mi
         {!short && (
           <Panel height={phone ? undefined : 300} flexShrink={0} gap={9} padding={15}>
             <Container flexDirection="row" justifyContent="space-between" alignItems="center">
-              <Label>LIVE OPERATIONS</Label>
-              <Ghost onClick={() => setView("missions")}>VIEW ALL</Ghost>
+              <Label>{t("LIVE OPERATIONS")}</Label>
+              <Ghost onClick={() => setView("missions")}>{t("VIEW ALL")}</Ghost>
             </Container>
             {missions.slice(0, phone ? 1 : 2).map((mission) => (
               <Container
@@ -683,11 +802,11 @@ function Command({ compact, phone, short, intent, setIntent, deploy, pending, mi
                 hover={{ borderColor: CYAN, transformTranslateZ: 4 }}
               >
                 <Container flexDirection="row" justifyContent="space-between">
-                  <Label color={GREEN}>{`● ${mission.phase.toUpperCase()}`}</Label>
+                  <Label color={GREEN}>{`● ${t(mission.phase).toUpperCase()}`}</Label>
                   <Label>{mission.id}</Label>
                 </Container>
-                <Text fontSize={15} lineHeight="19px" fontWeight="bold" color="#ffffff">{mission.name}</Text>
-                <Text fontSize={13} lineHeight="17px" color={MUTED}>{`${mission.payout} · Enter live console`}</Text>
+                <Text fontSize={15} lineHeight="19px" fontWeight="bold" color="#ffffff">{t(mission.name)}</Text>
+                <Text fontSize={13} lineHeight="17px" color={MUTED}>{`${mission.payout} · ${t("Enter live console")}`}</Text>
                 <Progress value={mission.progress} height={5} backgroundColor="#222f42" />
               </Container>
             ))}
@@ -723,7 +842,7 @@ function Command({ compact, phone, short, intent, setIntent, deploy, pending, mi
                   setView("agents");
                 })}
               >
-                <Label color={agent.color}>{`${agent.role.toUpperCase()} · ${agent.score}`}</Label>
+                <Label color={agent.color}>{`${t(agent.role).toUpperCase()} · ${agent.score}`}</Label>
                 <Text fontSize={14} lineHeight="17px" fontWeight="bold" color="#ffffff">{agent.name}</Text>
               </Container>
             ))}
@@ -736,19 +855,20 @@ function Command({ compact, phone, short, intent, setIntent, deploy, pending, mi
 
 function Bounties({ compact, phone, items, deploy }: { compact: boolean; phone: boolean; items: Bounty[]; deploy: (value?: string) => void }) {
   const { s } = useHudMetrics();
+  const { t } = useSpatialI18n();
   return (
     <Container width="100%" flexDirection="column" gap={phone ? 10 : 15} flexShrink={0}>
-      <Title compact={compact} phone={phone} eyebrow="BOUNTY ARENA · SEASON 04" title="Choose a real quest." description="Funded outcomes become playable operations. Every reward is guarded by evidence, permissions, and a final proof gate." />
+      <Title compact={compact} phone={phone} eyebrow={t("BOUNTY ARENA · SEASON 04")} title={t("Choose a real quest.")} description={t("Funded outcomes become playable operations. Every reward is guarded by evidence, permissions, and a final proof gate.")} />
       {items.map((bounty, index) => (
         <ListCard key={bounty.id} accent={index === 0 ? `${VIOLET}88` : BORDER}>
           <Container flexDirection="row" justifyContent="space-between">
-            <Label color={index === 0 ? VIOLET : GOLD}>{bounty.difficulty}</Label>
+            <Label color={index === 0 ? VIOLET : GOLD}>{t(bounty.difficulty)}</Label>
             <Label>{bounty.id}</Label>
           </Container>
-          <Text fontSize={s(18)} lineHeight={`${s(22)}px`} fontWeight="bold" color="#ffffff" wordBreak="break-word">{bounty.title}</Text>
-          <Text fontSize={s(13)} lineHeight={`${s(17)}px`} color={MUTED}>{`Sponsored by ${bounty.sponsor}`}</Text>
+          <Text fontSize={s(18)} lineHeight={`${s(22)}px`} fontWeight="bold" color="#ffffff" wordBreak="break-word">{t(bounty.title)}</Text>
+          <Text fontSize={s(13)} lineHeight={`${s(17)}px`} color={MUTED}>{`${t("Sponsored by")} ${bounty.sponsor}`}</Text>
           <Text fontSize={s(24)} lineHeight={`${s(28)}px`} fontWeight="bold" color={GOLD}>{bounty.reward}</Text>
-          <Primary onClick={() => deploy(bounty.title)}>ACCEPT & ENTER CONSOLE →</Primary>
+          <Primary onClick={() => deploy(t(bounty.title))}>{t("ACCEPT & ENTER CONSOLE →")}</Primary>
         </ListCard>
       ))}
     </Container>
@@ -757,9 +877,11 @@ function Bounties({ compact, phone, items, deploy }: { compact: boolean; phone: 
 
 function Agents({ compact, phone, selected, setSelected, setView }: { compact: boolean; phone: boolean; selected: string[]; setSelected: Dispatch<SetStateAction<string[]>>; setView: (view: View) => void }) {
   const { s } = useHudMetrics();
+  const { t } = useSpatialI18n();
+  const audio = useGameAudio();
   return (
     <Container width="100%" flexDirection="column" gap={phone ? 10 : 15} flexShrink={0}>
-      <Title compact={compact} phone={phone} eyebrow="AGENT HANGAR · 142 ONLINE" title="Build a specialist squad." description="The units behind the glass are not avatars. Each has a role, verified history, and tightly bounded authority." />
+      <Title compact={compact} phone={phone} eyebrow={t("AGENT HANGAR · 142 ONLINE")} title={t("Build a specialist squad.")} description={t("The units behind the glass are not avatars. Each has a role, verified history, and tightly bounded authority.")} />
       {agents.map((agent) => {
         const chosen = selected.includes(agent.id);
         return (
@@ -767,26 +889,27 @@ function Agents({ compact, phone, selected, setSelected, setView }: { compact: b
             key={agent.id}
             glyph="◇"
             title={agent.name}
-            detail={`${chosen ? "SELECTED" : "READY"} · ${agent.role} · ${agent.specialty}`}
+            detail={`${t(chosen ? "SELECTED" : "READY")} · ${t(agent.role)} · ${t(agent.specialty)}`}
             accent={agent.color}
             active={chosen}
             height={s(72)}
-            onSelect={() => setSelected((list) => list.includes(agent.id) ? list.filter((id) => id !== agent.id) : [...list, agent.id])}
+            onSelect={() => { audio.click(); setSelected((list) => list.includes(agent.id) ? list.filter((id) => id !== agent.id) : [...list, agent.id]); }}
           />
         );
       })}
       <Panel flexDirection={compact ? "column" : "row"} alignItems={compact ? "stretch" : "center"} gap={12}>
         <Container flexGrow={1} flexDirection="column" gap={4}>
-          <Label color={selected.length >= 3 ? GREEN : MUTED}>{`${selected.length} SPECIALISTS SELECTED`}</Label>
-          <Text fontSize={14} lineHeight="18px" color="#ffffff">{selected.length >= 3 ? "Squad coverage is ready." : "Choose at least three complementary roles."}</Text>
+          <Label color={selected.length >= 3 ? GREEN : MUTED}>{`${selected.length} ${t("SPECIALISTS SELECTED")}`}</Label>
+          <Text fontSize={14} lineHeight="18px" color="#ffffff">{t(selected.length >= 3 ? "Squad coverage is ready." : "Choose at least three complementary roles.")}</Text>
         </Container>
-        <Primary disabled={selected.length < 3} onClick={() => setView("command")}>USE THIS SQUAD</Primary>
+        <Primary disabled={selected.length < 3} onClick={() => setView("command")}>{t("USE THIS SQUAD")}</Primary>
       </Panel>
     </Container>
   );
 }
 
 function MissionRoom({ compact, phone, mission, running, setRunning }: { compact: boolean; phone: boolean; mission: Mission; running: boolean; setRunning: (value: boolean) => void }) {
+  const { t } = useSpatialI18n();
   const [progress, setProgress] = useState(mission.progress);
   useEffect(() => {
     if (!running || progress >= 96) return;
@@ -803,18 +926,18 @@ function MissionRoom({ compact, phone, mission, running, setRunning }: { compact
   return (
     <Container width="100%" flexDirection="column" gap={phone ? 10 : 13} flexShrink={0}>
       <Container flexDirection={compact ? "column" : "row"} justifyContent="space-between" gap={12} flexShrink={0}>
-        <Title compact={compact} phone={phone} eyebrow={`LIVE OPERATION · ${mission.id}`} title={mission.name} description="This is the mission console: watch each specialist work while MANDATE blocks unauthorized transfers and contract writes." />
-        <Ghost active={running} onClick={() => setRunning(!running)}>{running ? "Ⅱ  PAUSE SQUAD" : "▶  RESUME SQUAD"}</Ghost>
+        <Title compact={compact} phone={phone} eyebrow={`${t("LIVE OPERATION")} · ${mission.id}`} title={t(mission.name)} description={t("This is the mission console: watch each specialist work while MANDATE blocks unauthorized transfers and contract writes.")} />
+        <Ghost active={running} onClick={() => setRunning(!running)}>{t(running ? "Ⅱ  PAUSE SQUAD" : "▶  RESUME SQUAD")}</Ghost>
       </Container>
       <Container flexDirection={compact ? "column" : "row"} gap={10} flexShrink={0}>
-        <Metric label="WORK COMPLETE" value={`${progress}%`} detail={phase} color={CYAN} />
-        <Metric label="REWARD RESERVED" value={mission.payout} detail="Released after proof" color={GOLD} />
-        <Metric label="SAFETY LIMITS" value="ALL SAFE" detail="Read · simulate · propose" color={GREEN} />
+        <Metric label={t("WORK COMPLETE")} value={`${progress}%`} detail={t(phase)} color={CYAN} />
+        <Metric label={t("REWARD RESERVED")} value={mission.payout} detail={t("Released after proof")} color={GOLD} />
+        <Metric label={t("SAFETY LIMITS")} value={t("ALL SAFE")} detail={t("Read · simulate · propose")} color={GREEN} />
       </Container>
       <Panel gap={12} backgroundColor="#07101be8">
         <Container flexDirection="row" justifyContent="space-between">
-          <Label color={running ? GREEN : GOLD}>{running ? "● SQUAD STREAMING" : "Ⅱ SQUAD PAUSED"}</Label>
-          <Label>{phase.toUpperCase()}</Label>
+          <Label color={running ? GREEN : GOLD}>{t(running ? "● SQUAD STREAMING" : "Ⅱ SQUAD PAUSED")}</Label>
+          <Label>{t(phase).toUpperCase()}</Label>
         </Container>
         <Progress value={progress} height={9} backgroundColor="#222f42" />
         {activity.map(([name, action, color], index) => {
@@ -825,7 +948,7 @@ function MissionRoom({ compact, phone, mission, running, setRunning }: { compact
               key={name}
               glyph="◇"
               title={name}
-              detail={`${action} · ${status}`}
+              detail={`${t(action)} · ${t(status)}`}
               accent={color}
               active={index === current}
               height={64}
@@ -838,23 +961,24 @@ function MissionRoom({ compact, phone, mission, running, setRunning }: { compact
 }
 
 function Vault({ compact, phone, wallet, connect, technical, setTechnical }: { compact: boolean; phone: boolean; wallet: string; connect: () => void; technical: boolean; setTechnical: (value: boolean) => void }) {
+  const { t } = useSpatialI18n();
   return (
     <Container width="100%" flexDirection="column" gap={14} flexShrink={0}>
-      <Title compact={compact} phone={phone} eyebrow="TREASURY VAULT · BNB SMART CHAIN" title="Money moves only after proof." description="Balances, authority, budget, approvals, and settlement gates are visible in one secure room." />
+      <Title compact={compact} phone={phone} eyebrow={t("TREASURY VAULT · BNB SMART CHAIN")} title={t("Money moves only after proof.")} description={t("Balances, authority, budget, approvals, and settlement gates are visible in one secure room.")} />
       <Container flexDirection={compact ? "column" : "row"} gap={12}>
         <Panel flexGrow={1} gap={13}>
-          <Label>CONNECTED WALLET</Label>
-          <Text fontSize={compact ? 24 : 34} lineHeight={compact ? "29px" : "39px"} fontWeight="bold" color="#ffffff">{wallet || "Not connected"}</Text>
-          <Text fontSize={14} lineHeight="19px" color={MUTED}>{wallet ? "BNB Smart Chain Testnet · ready" : "Connect to inspect and approve settlements."}</Text>
-          <Primary onClick={connect}>{wallet ? "WALLET CONNECTED" : "CONNECT WALLET"}</Primary>
+          <Label>{t("CONNECTED WALLET")}</Label>
+          <Text fontSize={compact ? 24 : 34} lineHeight={compact ? "29px" : "39px"} fontWeight="bold" color="#ffffff">{wallet ? t(wallet) : t("Not connected")}</Text>
+          <Text fontSize={14} lineHeight="19px" color={MUTED}>{t(wallet ? "BNB Smart Chain Testnet · ready" : "Connect to inspect and approve settlements.")}</Text>
+          <Primary onClick={connect}>{t(wallet ? "WALLET CONNECTED" : "CONNECT WALLET")}</Primary>
         </Panel>
         <Panel flexGrow={1} gap={11}>
-          <Label color={GREEN}>ACTIVE MANDATE · SAFE</Label>
-          <Text fontSize={23} lineHeight="27px" fontWeight="bold" color="#ffffff">Liquidity Intelligence</Text>
+          <Label color={GREEN}>{t("ACTIVE MANDATE · SAFE")}</Label>
+          <Text fontSize={23} lineHeight="27px" fontWeight="bold" color="#ffffff">{t("Liquidity Intelligence")}</Text>
           {[["Allowed", "Read · Simulate · Propose"], ["Budget", "1,200 / 1,500 USDT"], ["Expires", "47h 18m"], ["Approval", "Every transaction"]].map(([label, value]) => (
             <Container key={label} flexDirection="row" justifyContent="space-between" paddingY={5}>
-              <Text fontSize={14} lineHeight="18px" color={MUTED}>{label}</Text>
-              <Text fontSize={14} lineHeight="18px" fontWeight="bold" color="#dce6f3">{value}</Text>
+              <Text fontSize={14} lineHeight="18px" color={MUTED}>{t(label)}</Text>
+              <Text fontSize={14} lineHeight="18px" fontWeight="bold" color="#dce6f3">{t(value)}</Text>
             </Container>
           ))}
         </Panel>
@@ -862,16 +986,16 @@ function Vault({ compact, phone, wallet, connect, technical, setTechnical }: { c
       <Panel gap={10}>
         <Container flexDirection={compact ? "column" : "row"} alignItems={compact ? "stretch" : "center"} justifyContent="space-between" gap={8}>
           <Container flexDirection="column" gap={4}>
-            <Label>TECHNICAL LENS</Label>
-            <Text fontSize={14} lineHeight="19px" color="#ffffff">Reveal the protocol beneath the plain-language controls.</Text>
+            <Label>{t("TECHNICAL LENS")}</Label>
+            <Text fontSize={14} lineHeight="19px" color="#ffffff">{t("Reveal the protocol beneath the plain-language controls.")}</Text>
           </Container>
-          <Ghost active={technical} onClick={() => setTechnical(!technical)}>{technical ? "TECH ON" : "TECH OFF"}</Ghost>
+          <Ghost active={technical} onClick={() => setTechnical(!technical)}>{t(technical ? "TECH ON" : "TECH OFF")}</Ghost>
         </Container>
         {technical && (
           <Container flexDirection={compact ? "column" : "row"} gap={8}>
-            <Metric label="IDENTITY" value="ERC-8004" detail="Agent registry" color={CYAN} />
-            <Metric label="COMMERCE" value="ERC-8183" detail="Jobs and escrow" color={VIOLET} />
-            <Metric label="AUTHORITY" value="MANDATE" detail="Bounded permissions" color={GOLD} />
+            <Metric label={t("IDENTITY")} value="ERC-8004" detail={t("Agent registry")} color={CYAN} />
+            <Metric label={t("COMMERCE")} value="ERC-8183" detail={t("Jobs and escrow")} color={VIOLET} />
+            <Metric label={t("AUTHORITY")} value="MANDATE" detail={t("Bounded permissions")} color={GOLD} />
           </Container>
         )}
       </Panel>
@@ -880,36 +1004,38 @@ function Vault({ compact, phone, wallet, connect, technical, setTechnical }: { c
 }
 
 function FocusCard({ hovered, selected }: { hovered: string | null; selected: string[] }) {
+  const { t } = useSpatialI18n();
   const agent = hovered && hovered !== "core" ? agents.find((item) => item.id === hovered) : null;
   if (hovered === "core") {
     return (
       <Panel width={268} height={108} gap={5} borderColor={`${GOLD}88`} pointerEvents="none">
-        <Label color={GOLD}>CONTEXT · MISSION CORE</Label>
-        <Text fontSize={18} lineHeight="22px" fontWeight="bold" color="#ffffff">Shared objective</Text>
-        <Text fontSize={13} lineHeight="17px" color={MUTED}>Click the core to open the live console.</Text>
+        <Label color={GOLD}>{t("CONTEXT · MISSION CORE")}</Label>
+        <Text fontSize={18} lineHeight="22px" fontWeight="bold" color="#ffffff">{t("Shared objective")}</Text>
+        <Text fontSize={13} lineHeight="17px" color={MUTED}>{t("Click the core to open the live console.")}</Text>
       </Panel>
     );
   }
   if (!agent) {
     return (
       <Panel width={268} height={108} gap={5} pointerEvents="none">
-        <Label>CONTEXT · HANGAR</Label>
-        <Text fontSize={16} lineHeight="20px" fontWeight="bold" color="#ffffff">Hover a unit</Text>
-        <Text fontSize={13} lineHeight="17px" color={MUTED}>Nameplates and beams stay in WebGL. Click to inspect a role.</Text>
+        <Label>{t("CONTEXT · HANGAR")}</Label>
+        <Text fontSize={16} lineHeight="20px" fontWeight="bold" color="#ffffff">{t("Hover a unit")}</Text>
+        <Text fontSize={13} lineHeight="17px" color={MUTED}>{t("Nameplates and beams stay in WebGL. Click to inspect a role.")}</Text>
       </Panel>
     );
   }
   return (
     <Panel width={268} height={108} gap={5} borderColor={agent.color} pointerEvents="none">
-      <Label color={agent.color}>{selected.includes(agent.id) ? "SELECTED UNIT" : "FOCUSED UNIT"}</Label>
-      <Text fontSize={18} lineHeight="22px" fontWeight="bold" color="#ffffff">{`${agent.name} · ${agent.role}`}</Text>
-      <Text fontSize={13} lineHeight="17px" color={MUTED}>{agent.specialty}</Text>
+      <Label color={agent.color}>{t(selected.includes(agent.id) ? "SELECTED UNIT" : "FOCUSED UNIT")}</Label>
+      <Text fontSize={18} lineHeight="22px" fontWeight="bold" color="#ffffff">{`${agent.name} · ${t(agent.role)}`}</Text>
+      <Text fontSize={13} lineHeight="17px" color={MUTED}>{t(agent.specialty)}</Text>
     </Panel>
   );
 }
 
 function Academy({ compact, phone }: { compact: boolean; phone: boolean }) {
   const { s } = useHudMetrics();
+  const { t } = useSpatialI18n();
   const steps = [
     ["1", "Describe an outcome", "Say what you need in everyday language."],
     ["2", "Inspect the squad", "See who will find, test, protect, and verify."],
@@ -918,10 +1044,10 @@ function Academy({ compact, phone }: { compact: boolean; phone: boolean }) {
   ];
   return (
     <Container width="100%" flexDirection="column" gap={15} flexShrink={0}>
-      <Title compact={compact} phone={phone} eyebrow="AGENT ACADEMY · TUTOR ONLINE" title="Understand it by operating it." description="A guided flight manual for newcomers, with technical depth available whenever an expert wants it." />
-      <Label color={GOLD}>START HERE · 3 MINUTES</Label>
+      <Title compact={compact} phone={phone} eyebrow={t("AGENT ACADEMY · TUTOR ONLINE")} title={t("Understand it by operating it.")} description={t("A guided flight manual for newcomers, with technical depth available whenever an expert wants it.")} />
+      <Label color={GOLD}>{t("START HERE · 3 MINUTES")}</Label>
       {steps.map(([number, title, copy]) => (
-        <ListRow key={number} glyph={number} title={title} detail={copy} accent={GOLD} height={s(72)} />
+        <ListRow key={number} glyph={number} title={t(title)} detail={t(copy)} accent={GOLD} height={s(72)} />
       ))}
     </Container>
   );
@@ -929,9 +1055,12 @@ function Academy({ compact, phone }: { compact: boolean; phone: boolean }) {
 
 function Hud() {
   const { compact, phone, s, listHeight } = useHudMetrics();
+  const audio = useGameAudio();
+  const { setLocale, t } = useSpatialI18n();
+  const intentInput = useRef<VanillaInput | null>(null);
   const short = phone;
   const [view, setView] = useState<View>("command");
-  const [intent, setIntent] = useState("Map the safest BNB liquidity routes");
+  const [intent, setIntent] = useState(() => t("Map the safest BNB liquidity routes"));
   const [pending, setPending] = useState(false);
   const [running, setRunning] = useState(true);
   const [wallet, setWallet] = useState("");
@@ -942,11 +1071,33 @@ function Hud() {
   const [selected, setSelected] = useState<string[]>(["nexus", "vector", "aegis", "oracle"]);
   const [hovered, setHovered] = useState<string | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [lastAction, setLastAction] = useState(() => t("COMMAND DECK ONLINE"));
+  const [deployFx, setDeployFx] = useState(0);
   const currentNav = navigation.find(([id]) => id === view) ?? navigation[0];
 
-  useEffect(() => {
+  const goTo = useCallback((next: View) => {
+    const label = navigation.find(([id]) => id === next)?.[1] || next.toUpperCase();
+    audio.click();
+    setView(next);
     setMenuOpen(false);
-  }, [view]);
+    setLastAction(`${t(label)} · ${t("DECK ONLINE")}`);
+  }, [audio, t]);
+
+  const changeLocale = useCallback((next: Locale) => {
+    setIntent((current) => {
+      const defaultIntent = "Map the safest BNB liquidity routes";
+      const isDefault = languages.some((language) => translate(language.id, defaultIntent) === current);
+      return isDefault ? translate(next, defaultIntent) : current;
+    });
+    setLocale(next);
+    setLastAction(translate(next, "LANGUAGE LINK ONLINE"));
+  }, [setLocale]);
+
+  useEffect(() => {
+    if (!lastAction) return;
+    const timer = window.setTimeout(() => setLastAction(""), 2400);
+    return () => window.clearTimeout(timer);
+  }, [lastAction]);
 
   useEffect(() => {
     fetch("/api/state")
@@ -978,8 +1129,11 @@ function Hud() {
       .catch(() => undefined);
   }, []);
 
-  const deploy = async (override?: string) => {
+  const deploy = useCallback(async (override?: string) => {
     const objective = override || intent || "Agent squad mission";
+    audio.deploy();
+    setDeployFx((value) => value + 1);
+    setLastAction(t("SQUAD LAUNCH SEQUENCE ENGAGED"));
     setPending(true);
     const optimisticMission: Mission = { id: `M-${Date.now().toString().slice(-4)}`, name: objective, phase: "Execution", progress: 5, payout: "1,200 USDT" };
     let mission = optimisticMission;
@@ -1011,7 +1165,8 @@ function Hud() {
     setActiveMission(mission);
     setMissions((list) => [mission, ...list.filter((item) => item.id !== optimisticMission.id && item.id !== mission.id)]);
     setPending(false);
-  };
+    setLastAction(`${mission.id} · ${t("LIVE CONSOLE ONLINE")}`);
+  }, [audio, intent, t]);
 
   const connect = async () => {
     const ethereum = (window as typeof window & { ethereum?: { request: (args: { method: string; params?: unknown[] }) => Promise<unknown> } }).ethereum;
@@ -1041,22 +1196,57 @@ function Hud() {
     if (accounts?.[0]) setWallet(`${accounts[0].slice(0, 6)}…${accounts[0].slice(-4)}`);
   };
 
-  const openMission = (mission: Mission) => {
+  const openMission = useCallback((mission: Mission) => {
+    audio.click();
     setActiveMission(mission);
     setRunning(mission.progress < 100);
     setView("missions");
-  };
+    setLastAction(`${mission.id} · ${t("LIVE CONSOLE ONLINE")}`);
+  }, [audio, t]);
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      const active = document.activeElement;
+      const editing = active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement;
+      if (editing) {
+        if (event.key === "Enter" && view === "command" && intent.trim()) {
+          event.preventDefault();
+          intentInput.current?.blur();
+          void deploy();
+        } else if (event.key === "Escape") intentInput.current?.blur();
+        return;
+      }
+      if (event.key === "/") {
+        event.preventDefault();
+        if (view !== "command") goTo("command");
+        window.setTimeout(() => intentInput.current?.focus(), 80);
+        setLastAction(t("COMMAND CHANNEL READY · TYPE YOUR MISSION"));
+        return;
+      }
+      if (event.key.toLowerCase() === "m") {
+        const goingMuted = audio.started && !audio.muted;
+        audio.toggle();
+        setLastAction(t(goingMuted ? "AUDIO LINK MUTED" : "AUDIO LINK ONLINE"));
+        return;
+      }
+      const index = Number(event.key) - 1;
+      if (Number.isInteger(index) && index >= 0 && index < navigation.length) goTo(navigation[index][0]);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [audio, deploy, goTo, intent, t, view]);
 
   return (
     <>
       <Hangar
         view={view}
+        deployFx={deployFx}
         selected={selected}
         hovered={hovered}
         compact={compact}
         setSelected={setSelected}
-        setHovered={setHovered}
-        setView={setView}
+        setHovered={(id) => { if (id) audio.hover(); setHovered(id); }}
+        setView={goTo}
       />
       <DreiHud renderPriority={2}>
         <OrthographicCamera makeDefault position={[0, 0, 100]} near={0.1} far={200} />
@@ -1088,11 +1278,11 @@ function Hud() {
           {!phone && (
             <Container width={210} height={40} flexShrink={0} flexDirection="column" justifyContent="center" gap={1}>
               <Text fontSize={17} lineHeight="20px" fontWeight="bold" letterSpacing={0.6} color="#ffffff">BINANCEFF2</Text>
-              <Text fontSize={12} lineHeight="14px" letterSpacing={1.45} color={MUTED}>ORBITAL COMMAND</Text>
+              <Text fontSize={12} lineHeight="14px" letterSpacing={1.45} color={MUTED}>{t("ORBITAL COMMAND")}</Text>
             </Container>
           )}
           <Container flexGrow={1} />
-          {!compact && <Container width={285} alignItems="flex-end"><Label color={GREEN}>● BNB NETWORK ONLINE · 142 UNITS</Label></Container>}
+          {!compact && <Container width={285} alignItems="flex-end"><Label color={GREEN}>{t("● BNB NETWORK ONLINE · 142 UNITS")}</Label></Container>}
           {compact && (
             <Container
               height={36}
@@ -1108,13 +1298,26 @@ function Hud() {
               cursor="pointer"
               pointerEvents="auto"
               pointerEventsOrder={24}
-              onClick={press(() => setMenuOpen((value) => !value))}
+              onHoverChange={(active) => { if (active) audio.hover(); }}
+              onClick={press(() => { audio.click(); setMenuOpen((value) => !value); })}
             >
               <Text width={16} textAlign="center" fontSize={13} lineHeight="16px" color={GOLD}>{currentNav[2]}</Text>
-              <Text width={phone ? 86 : 92} fontSize={12} lineHeight="15px" fontWeight="bold" color="#ffffff">{currentNav[1]}</Text>
+              <Text width={phone ? 86 : 92} fontSize={12} lineHeight="15px" fontWeight="bold" color="#ffffff">{t(currentNav[1])}</Text>
               <Text width={12} textAlign="center" fontSize={12} lineHeight="15px" color={GOLD}>{menuOpen ? "▴" : "▾"}</Text>
             </Container>
           )}
+          <LanguageSelector phone={phone} onSelect={changeLocale} />
+          <Ghost
+            sound={false}
+            active={audio.started && !audio.muted}
+            onClick={() => {
+              const goingMuted = audio.started && !audio.muted;
+              audio.toggle();
+              setLastAction(t(goingMuted ? "AUDIO LINK MUTED" : "AUDIO LINK ONLINE"));
+            }}
+          >
+            {phone ? "♫" : t(!audio.started ? "♫ START AUDIO" : audio.muted ? "♫ AUDIO OFF" : "♫ AUDIO ON")}
+          </Ghost>
           <Ghost onClick={() => { window.location.href = "/"; }}>{phone ? "V1" : "V1 ↗"}</Ghost>
         </Container>
 
@@ -1134,11 +1337,11 @@ function Hud() {
               <ListRow
                 key={id}
                 glyph={glyph}
-                title={label}
+                title={t(label)}
                 accent={GOLD}
                 active={view === id}
                 height={s(46)}
-                onSelect={() => setView(id)}
+                onSelect={() => goTo(id)}
               />
             ))}
           </Container>
@@ -1164,25 +1367,27 @@ function Hud() {
                   borderColor={view === id ? GOLD : "#00000000"}
                   borderWidth={1}
                   hover={{ backgroundColor: "#152239", transformTranslateZ: 4 }}
-                  onClick={press(() => setView(id))}
+                  active={{ transformScale: 0.965, backgroundColor: "#09111f" }}
+                  onHoverChange={(active) => { if (active) audio.hover(); }}
+                  onClick={press(() => goTo(id))}
                 >
                   <Text width={20} textAlign="center" fontSize={16} lineHeight="20px" color={view === id ? GOLD : "#7f91a9"}>{glyph}</Text>
-                  <Text width={130} fontSize={14} lineHeight="17px" fontWeight="bold" letterSpacing={0.65} color={view === id ? "#ffffff" : "#92a1b5"}>{label}</Text>
+                  <Text width={130} fontSize={14} lineHeight="17px" fontWeight="bold" letterSpacing={0.65} color={view === id ? "#ffffff" : "#92a1b5"}>{t(label)}</Text>
                 </Container>
               ))}
               <Container flexGrow={1} />
               <Panel height={122} flexShrink={0} padding={12} gap={7} backgroundColor="#0a151cee" borderColor="#285145">
-                <Label color={GREEN}>MANDATE · SAFE</Label>
-                <Text fontSize={13} lineHeight="18px" color="#b1becc">Agents can read, test, and propose. You approve money movement.</Text>
+                <Label color={GREEN}>{t("MANDATE · SAFE")}</Label>
+                <Text fontSize={13} lineHeight="18px" color="#b1becc">{t("Agents can read, test, and propose. You approve money movement.")}</Text>
               </Panel>
             </Container>
           )}
 
           <Container flexGrow={1} minWidth={0} minHeight={0} padding={compact ? 1 : 7} overflow="hidden" pointerEvents={compact ? "auto" : "listener"}>
             <ScrollList height={listHeight(menuOpen)}>
-              {view === "command" && <Command compact={compact} phone={phone} short={short} intent={intent} setIntent={setIntent} deploy={deploy} pending={pending} missions={missions} openMission={openMission} setView={setView} hovered={hovered} selected={selected} setSelected={setSelected} />}
+              {view === "command" && <Command compact={compact} phone={phone} short={short} intent={intent} setIntent={setIntent} deploy={deploy} pending={pending} missions={missions} openMission={openMission} setView={goTo} hovered={hovered} selected={selected} setSelected={setSelected} registerIntentInput={(input) => { intentInput.current = input; }} />}
               {view === "bounties" && <Bounties compact={compact} phone={phone} items={bounties} deploy={deploy} />}
-              {view === "agents" && <Agents compact={compact} phone={phone} selected={selected} setSelected={setSelected} setView={setView} />}
+              {view === "agents" && <Agents compact={compact} phone={phone} selected={selected} setSelected={setSelected} setView={goTo} />}
               {view === "missions" && <MissionRoom key={activeMission.id} compact={compact} phone={phone} mission={activeMission} running={running} setRunning={setRunning} />}
               {view === "vault" && <Vault compact={compact} phone={phone} wallet={wallet} connect={connect} technical={technical} setTechnical={setTechnical} />}
               {view === "academy" && <Academy compact={compact} phone={phone} />}
@@ -1192,8 +1397,8 @@ function Hud() {
 
         {!compact && (
           <Container height={26} flexShrink={0} flexDirection="row" alignItems="center" justifyContent="space-between" paddingX={7} pointerEvents="none">
-            <Label>{hovered === "core" ? "MISSION CORE READY · CLICK TO ENTER CONSOLE" : hovered ? `READING ${hovered.toUpperCase()} · CLICK TO INSPECT` : "HOVER A UNIT · ENTER A BOUNTY · WATCH THE SQUAD WORK"}</Label>
-            <Label color={GOLD}>WEBGL HUD · ALT + 3</Label>
+            <Label>{lastAction || t(hovered === "core" ? "MISSION CORE READY · CLICK TO ENTER CONSOLE" : hovered ? "READING UNIT · CLICK TO INSPECT" : "/ INPUT · ENTER DEPLOY · 1–6 NAV · M AUDIO")}</Label>
+            <Label color={lastAction ? GREEN : GOLD}>{lastAction ? "●" : t("SPATIAL LAYER · READY")}</Label>
           </Container>
         )}
         </Fullscreen>
@@ -1204,6 +1409,7 @@ function Hud() {
 
 const Hangar = memo(function Hangar({
   view,
+  deployFx,
   selected,
   hovered,
   compact,
@@ -1212,6 +1418,7 @@ const Hangar = memo(function Hangar({
   setView,
 }: {
   view: View;
+  deployFx: number;
   selected: string[];
   hovered: string | null;
   compact: boolean;
@@ -1223,6 +1430,7 @@ const Hangar = memo(function Hangar({
     <Selection>
       <World
         view={view}
+        deployFx={deployFx}
         selected={selected}
         hovered={hovered}
         compact={compact}
@@ -1240,8 +1448,11 @@ const Hangar = memo(function Hangar({
 
 export function SpatialInterface() {
   return (
+    <SpatialI18nProvider>
+    <GameAudioProvider>
     <main className="spatial-shell" aria-label="BinanceFF2 cinematic spatial command interface">
       <Canvas
+        {...canvasInputProps}
         shadows
         dpr={[1, 1.75]}
         camera={{ position: [0, 2.2, 13.8], fov: 42 }}
@@ -1259,5 +1470,7 @@ export function SpatialInterface() {
         </Suspense>
       </Canvas>
     </main>
+    </GameAudioProvider>
+    </SpatialI18nProvider>
   );
 }
