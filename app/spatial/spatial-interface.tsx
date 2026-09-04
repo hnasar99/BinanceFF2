@@ -5,13 +5,16 @@ import {
   Billboard,
   ContactShadows,
   Grid,
+  Hud as DreiHud,
   Line,
   MeshReflectorMaterial,
+  OrthographicCamera,
   Sparkles,
   Stars,
 } from "@react-three/drei";
 import { Container, Fullscreen, Text } from "@react-three/uikit";
 import { Button, Input, Progress } from "@react-three/uikit-default";
+import { ListCard, ListRow, ScrollList, press, useHudMetrics } from "./hud-kit";
 import {
   EffectComposer,
   Select,
@@ -71,16 +74,10 @@ type StatePayload = {
   bounties?: Array<{ publicCode?: string; title?: string; sponsor?: string; rewardAmount?: number; rewardAsset?: string; difficulty?: string }>;
 };
 
-function press(handler: () => void) {
-  return (event: { stopPropagation: () => void }) => {
-    event.stopPropagation();
-    handler();
-  };
-}
-
 function Label({ children, color = MUTED }: { children: ReactNode; color?: string }) {
+  const { s } = useHudMetrics();
   return (
-    <Text fontSize={13} lineHeight="16px" letterSpacing={1.1} color={color} fontWeight="bold">
+    <Text fontSize={s(13)} lineHeight={`${s(16)}px`} letterSpacing={1.1} color={color} fontWeight="bold">
       {children}
     </Text>
   );
@@ -96,7 +93,7 @@ function Panel({ children, ...props }: ComponentProps<typeof Container>) {
       padding={18}
       flexDirection="column"
       alignItems="stretch"
-      overflow="hidden"
+      overflow="visible"
       pointerEvents="auto"
       {...props}
     >
@@ -140,9 +137,10 @@ function WorldLabel({
 }
 
 function Primary({ children, onClick, disabled = false }: { children: ReactNode; onClick: () => void; disabled?: boolean }) {
+  const { s } = useHudMetrics();
   return (
     <Button
-      height={46}
+      height={s(46)}
       disabled={disabled}
       onClick={press(() => { if (!disabled) onClick(); })}
       backgroundColor={GOLD}
@@ -154,15 +152,16 @@ function Primary({ children, onClick, disabled = false }: { children: ReactNode;
       hover={{ backgroundColor: "#ffd665", transformScale: 1.015 }}
       active={{ transformScale: 0.98 }}
     >
-      <Text fontSize={14} lineHeight="17px" fontWeight="bold" letterSpacing={0.55}>{children}</Text>
+      <Text fontSize={s(14)} lineHeight={`${s(17)}px`} fontWeight="bold" letterSpacing={0.55}>{children}</Text>
     </Button>
   );
 }
 
 function Ghost({ children, onClick, active = false }: { children: ReactNode; onClick: () => void; active?: boolean }) {
+  const { s } = useHudMetrics();
   return (
     <Button
-      height={40}
+      height={s(40)}
       onClick={press(onClick)}
       variant="outline"
       backgroundColor={active ? "#f3ba2f25" : "#09101bdd"}
@@ -175,29 +174,31 @@ function Ghost({ children, onClick, active = false }: { children: ReactNode; onC
       hover={{ backgroundColor: "#16243a", color: "#ffffff" }}
       active={{ transformScale: 0.98 }}
     >
-      <Text fontSize={13} lineHeight="16px" fontWeight="bold" letterSpacing={0.4}>{children}</Text>
+      <Text fontSize={s(13)} lineHeight={`${s(16)}px`} fontWeight="bold" letterSpacing={0.4}>{children}</Text>
     </Button>
   );
 }
 
 function Metric({ label, value, detail, color = "#f4f7ff" }: { label: string; value: string; detail: string; color?: string }) {
+  const { s } = useHudMetrics();
   return (
-    <Panel flexGrow={1} minWidth={0} gap={5} padding={15}>
+    <Panel flexGrow={1} minWidth={0} gap={5} padding={s(14)}>
       <Label>{label}</Label>
-      <Text fontSize={24} lineHeight="28px" fontWeight="bold" color={color}>{value}</Text>
-      <Text fontSize={13} lineHeight="17px" color={MUTED}>{detail}</Text>
+      <Text fontSize={s(22)} lineHeight={`${s(26)}px`} fontWeight="bold" color={color}>{value}</Text>
+      <Text fontSize={s(13)} lineHeight={`${s(16)}px`} color={MUTED}>{detail}</Text>
     </Panel>
   );
 }
 
 function Title({ eyebrow, title, description, compact, phone }: { eyebrow: string; title: string; description: string; compact?: boolean; phone?: boolean }) {
+  const { s } = useHudMetrics();
   return (
-    <Container flexDirection="column" gap={phone ? 4 : 6} flexShrink={0}>
+    <Container flexDirection="column" gap={phone ? 4 : 6} flexShrink={0} width="100%">
       <Label color={CYAN}>{eyebrow}</Label>
-      <Text fontSize={phone ? 24 : compact ? 30 : 40} lineHeight={phone ? "28px" : compact ? "35px" : "45px"} fontWeight="bold" color="#f8fbff">
+      <Text fontSize={s(phone ? 22 : compact ? 28 : 38)} lineHeight={`${s(phone ? 26 : compact ? 33 : 43)}px`} fontWeight="bold" color="#f8fbff" wordBreak="break-word">
         {title}
       </Text>
-      {!phone && <Text fontSize={15} lineHeight="21px" color={MUTED} maxWidth={760}>{description}</Text>}
+      {!phone && <Text fontSize={s(15)} lineHeight={`${s(20)}px`} color={MUTED} maxWidth={760}>{description}</Text>}
     </Container>
   );
 }
@@ -596,11 +597,11 @@ function Command({ compact, phone, short, intent, setIntent, deploy, pending, mi
   setSelected: Dispatch<SetStateAction<string[]>>;
 }) {
   return (
-    <Container flexGrow={1} minHeight={0} flexDirection={compact ? "column" : "row"} gap={phone ? 10 : 14} overflow="hidden">
-      <Container width={compact ? "100%" : 540} flexGrow={compact ? 1 : 0} minHeight={0} flexShrink={compact ? 1 : 0} flexDirection="column" gap={phone ? 8 : 12} overflow="scroll" scrollbarColor="#34445e">
+    <Container width="100%" flexDirection={compact ? "column" : "row"} gap={phone ? 10 : 14}>
+      <Container width={compact ? "100%" : 540} flexDirection="column" gap={phone ? 8 : 12} flexShrink={0}>
         <Panel flexShrink={0} gap={phone ? 9 : 13} padding={phone ? 14 : compact ? 18 : 25} backgroundColor="#07101be8" borderColor="#3a4d69">
           <Label color={GOLD}>{phone ? "ORBITAL COMMAND" : "ORBITAL COMMAND · BNB AGENT NETWORK"}</Label>
-          <Text fontSize={phone ? 26 : compact ? 31 : 42} lineHeight={phone ? "30px" : compact ? "36px" : "47px"} fontWeight="bold" color="#ffffff">
+          <Text fontSize={phone ? 24 : compact ? 30 : 40} lineHeight={phone ? "28px" : compact ? "34px" : "44px"} fontWeight="bold" color="#ffffff" wordBreak="break-word">
             Deploy intelligence, not just capital.
           </Text>
           {!phone && (
@@ -734,60 +735,46 @@ function Command({ compact, phone, short, intent, setIntent, deploy, pending, mi
 }
 
 function Bounties({ compact, phone, items, deploy }: { compact: boolean; phone: boolean; items: Bounty[]; deploy: (value?: string) => void }) {
+  const { s } = useHudMetrics();
   return (
-    <Container flexGrow={1} minHeight={0} flexDirection="column" gap={phone ? 10 : 15} overflow="scroll" scrollbarColor="#34445e">
+    <Container width="100%" flexDirection="column" gap={phone ? 10 : 15} flexShrink={0}>
       <Title compact={compact} phone={phone} eyebrow="BOUNTY ARENA · SEASON 04" title="Choose a real quest." description="Funded outcomes become playable operations. Every reward is guarded by evidence, permissions, and a final proof gate." />
-      <Container flexDirection={compact ? "column" : "row"} gap={13} flexWrap="wrap">
-        {items.map((bounty, index) => (
-          <Panel key={bounty.id} width={compact ? "100%" : 300} height={phone ? undefined : 340} flexShrink={0} gap={12} borderColor={index === 0 ? `${VIOLET}88` : BORDER} hover={{ borderColor: index === 0 ? VIOLET : GOLD, transformTranslateZ: 6 }}>
-            <Container flexDirection="row" justifyContent="space-between">
-              <Label color={index === 0 ? VIOLET : GOLD}>{bounty.difficulty}</Label>
-              <Label>{bounty.id}</Label>
-            </Container>
-            <Text fontSize={21} lineHeight="26px" fontWeight="bold" color="#ffffff">{bounty.title}</Text>
-            <Text fontSize={14} lineHeight="19px" color={MUTED}>{`Sponsored by ${bounty.sponsor}`}</Text>
-            <Text fontSize={27} lineHeight="32px" fontWeight="bold" color={GOLD}>{bounty.reward}</Text>
-            <Text fontSize={14} lineHeight="20px" color="#a7b4c7">Deploy a squad, watch its work in the console, and earn after verification.</Text>
-            <Primary onClick={() => deploy(bounty.title)}>ACCEPT & ENTER CONSOLE →</Primary>
-          </Panel>
-        ))}
-      </Container>
+      {items.map((bounty, index) => (
+        <ListCard key={bounty.id} accent={index === 0 ? `${VIOLET}88` : BORDER}>
+          <Container flexDirection="row" justifyContent="space-between">
+            <Label color={index === 0 ? VIOLET : GOLD}>{bounty.difficulty}</Label>
+            <Label>{bounty.id}</Label>
+          </Container>
+          <Text fontSize={s(18)} lineHeight={`${s(22)}px`} fontWeight="bold" color="#ffffff" wordBreak="break-word">{bounty.title}</Text>
+          <Text fontSize={s(13)} lineHeight={`${s(17)}px`} color={MUTED}>{`Sponsored by ${bounty.sponsor}`}</Text>
+          <Text fontSize={s(24)} lineHeight={`${s(28)}px`} fontWeight="bold" color={GOLD}>{bounty.reward}</Text>
+          <Primary onClick={() => deploy(bounty.title)}>ACCEPT & ENTER CONSOLE →</Primary>
+        </ListCard>
+      ))}
     </Container>
   );
 }
 
 function Agents({ compact, phone, selected, setSelected, setView }: { compact: boolean; phone: boolean; selected: string[]; setSelected: Dispatch<SetStateAction<string[]>>; setView: (view: View) => void }) {
+  const { s } = useHudMetrics();
   return (
-    <Container flexGrow={1} minHeight={0} flexDirection="column" gap={phone ? 10 : 15} overflow="scroll" scrollbarColor="#34445e">
+    <Container width="100%" flexDirection="column" gap={phone ? 10 : 15} flexShrink={0}>
       <Title compact={compact} phone={phone} eyebrow="AGENT HANGAR · 142 ONLINE" title="Build a specialist squad." description="The units behind the glass are not avatars. Each has a role, verified history, and tightly bounded authority." />
-      <Container flexDirection={compact ? "column" : "row"} gap={11} flexWrap="wrap">
-        {agents.map((agent) => {
-          const chosen = selected.includes(agent.id);
-          return (
-            <Panel
-              key={agent.id}
-              width={compact ? "100%" : 250}
-              height={phone ? undefined : 228}
-              flexShrink={0}
-              gap={8}
-              cursor="pointer"
-              pointerEventsOrder={20}
-              onClick={press(() => setSelected((list) => list.includes(agent.id) ? list.filter((id) => id !== agent.id) : [...list, agent.id]))}
-              borderColor={chosen ? agent.color : BORDER}
-              backgroundColor={chosen ? `${agent.color}18` : PANEL}
-              hover={{ transformTranslateZ: 6, borderColor: agent.color }}
-            >
-              <Container width={52} height={52} borderRadius={12} alignItems="center" justifyContent="center" backgroundColor={`${agent.color}20`} borderColor={agent.color} borderWidth={1}>
-                <Text fontSize={24} lineHeight="28px" color={agent.color}>◇</Text>
-              </Container>
-              <Label color={agent.color}>{`${chosen ? "SELECTED" : "READY"} · RATING ${agent.score}`}</Label>
-              <Text fontSize={22} lineHeight="26px" fontWeight="bold" color="#ffffff">{agent.name}</Text>
-              <Text fontSize={14} lineHeight="19px" color="#d2d9e5">{agent.role}</Text>
-              <Text fontSize={13} lineHeight="18px" color={MUTED}>{agent.specialty}</Text>
-            </Panel>
-          );
-        })}
-      </Container>
+      {agents.map((agent) => {
+        const chosen = selected.includes(agent.id);
+        return (
+          <ListRow
+            key={agent.id}
+            glyph="◇"
+            title={agent.name}
+            detail={`${chosen ? "SELECTED" : "READY"} · ${agent.role} · ${agent.specialty}`}
+            accent={agent.color}
+            active={chosen}
+            height={s(72)}
+            onSelect={() => setSelected((list) => list.includes(agent.id) ? list.filter((id) => id !== agent.id) : [...list, agent.id])}
+          />
+        );
+      })}
       <Panel flexDirection={compact ? "column" : "row"} alignItems={compact ? "stretch" : "center"} gap={12}>
         <Container flexGrow={1} flexDirection="column" gap={4}>
           <Label color={selected.length >= 3 ? GREEN : MUTED}>{`${selected.length} SPECIALISTS SELECTED`}</Label>
@@ -814,7 +801,7 @@ function MissionRoom({ compact, phone, mission, running, setRunning }: { compact
     ["ORACLE", "Sealing reproducible evidence", GREEN],
   ];
   return (
-    <Container flexGrow={1} minHeight={0} flexDirection="column" gap={phone ? 10 : 13} overflow="scroll" scrollbarColor="#34445e">
+    <Container width="100%" flexDirection="column" gap={phone ? 10 : 13} flexShrink={0}>
       <Container flexDirection={compact ? "column" : "row"} justifyContent="space-between" gap={12} flexShrink={0}>
         <Title compact={compact} phone={phone} eyebrow={`LIVE OPERATION · ${mission.id}`} title={mission.name} description="This is the mission console: watch each specialist work while MANDATE blocks unauthorized transfers and contract writes." />
         <Ghost active={running} onClick={() => setRunning(!running)}>{running ? "Ⅱ  PAUSE SQUAD" : "▶  RESUME SQUAD"}</Ghost>
@@ -824,7 +811,7 @@ function MissionRoom({ compact, phone, mission, running, setRunning }: { compact
         <Metric label="REWARD RESERVED" value={mission.payout} detail="Released after proof" color={GOLD} />
         <Metric label="SAFETY LIMITS" value="ALL SAFE" detail="Read · simulate · propose" color={GREEN} />
       </Container>
-      <Panel flexGrow={1} minHeight={phone ? 220 : 310} gap={12} justifyContent="center" backgroundColor="#07101be8">
+      <Panel gap={12} backgroundColor="#07101be8">
         <Container flexDirection="row" justifyContent="space-between">
           <Label color={running ? GREEN : GOLD}>{running ? "● SQUAD STREAMING" : "Ⅱ SQUAD PAUSED"}</Label>
           <Label>{phase.toUpperCase()}</Label>
@@ -834,14 +821,15 @@ function MissionRoom({ compact, phone, mission, running, setRunning }: { compact
           const current = Math.min(3, Math.floor(progress / 25));
           const status = index < current ? "VERIFIED" : index === current ? "WORKING" : "QUEUED";
           return (
-            <Container key={name} flexDirection="row" alignItems="center" gap={11} padding={12} backgroundColor={index === current ? `${color}18` : "#101925d9"} borderColor={index === current ? color : "#2a394e"} borderWidth={1} borderRadius={8}>
-              <Container width={32} height={32} borderRadius={16} alignItems="center" justifyContent="center" backgroundColor={`${color}22`}>
-                <Text color={color} fontSize={15} lineHeight="18px">◇</Text>
-              </Container>
-              <Text width={82} fontSize={13} lineHeight="17px" fontWeight="bold" color={color}>{name}</Text>
-              <Text flexGrow={1} fontSize={14} lineHeight="19px" color="#c0cad8">{action}</Text>
-              <Label color={index <= current ? GREEN : MUTED}>{status}</Label>
-            </Container>
+            <ListRow
+              key={name}
+              glyph="◇"
+              title={name}
+              detail={`${action} · ${status}`}
+              accent={color}
+              active={index === current}
+              height={64}
+            />
           );
         })}
       </Panel>
@@ -851,7 +839,7 @@ function MissionRoom({ compact, phone, mission, running, setRunning }: { compact
 
 function Vault({ compact, phone, wallet, connect, technical, setTechnical }: { compact: boolean; phone: boolean; wallet: string; connect: () => void; technical: boolean; setTechnical: (value: boolean) => void }) {
   return (
-    <Container flexGrow={1} minHeight={0} flexDirection="column" gap={14} overflow="scroll" scrollbarColor="#34445e">
+    <Container width="100%" flexDirection="column" gap={14} flexShrink={0}>
       <Title compact={compact} phone={phone} eyebrow="TREASURY VAULT · BNB SMART CHAIN" title="Money moves only after proof." description="Balances, authority, budget, approvals, and settlement gates are visible in one secure room." />
       <Container flexDirection={compact ? "column" : "row"} gap={12}>
         <Panel flexGrow={1} gap={13}>
@@ -921,6 +909,7 @@ function FocusCard({ hovered, selected }: { hovered: string | null; selected: st
 }
 
 function Academy({ compact, phone }: { compact: boolean; phone: boolean }) {
+  const { s } = useHudMetrics();
   const steps = [
     ["1", "Describe an outcome", "Say what you need in everyday language."],
     ["2", "Inspect the squad", "See who will find, test, protect, and verify."],
@@ -928,32 +917,19 @@ function Academy({ compact, phone }: { compact: boolean; phone: boolean }) {
     ["4", "Approve the result", "Payment unlocks only after evidence passes."],
   ];
   return (
-    <Container flexGrow={1} minHeight={0} flexDirection="column" gap={15} overflow="scroll" scrollbarColor="#34445e">
+    <Container width="100%" flexDirection="column" gap={15} flexShrink={0}>
       <Title compact={compact} phone={phone} eyebrow="AGENT ACADEMY · TUTOR ONLINE" title="Understand it by operating it." description="A guided flight manual for newcomers, with technical depth available whenever an expert wants it." />
-      <Panel gap={13} maxWidth={820}>
-        <Label color={GOLD}>START HERE · 3 MINUTES</Label>
-        {steps.map(([number, title, copy]) => (
-          <Container key={number} flexDirection="row" gap={13} alignItems="center" padding={13} backgroundColor="#101925dc" borderRadius={8}>
-            <Container width={36} height={36} borderRadius={18} flexShrink={0} alignItems="center" justifyContent="center" backgroundColor="#f3ba2f20" borderColor={GOLD} borderWidth={1}>
-              <Text fontSize={14} lineHeight="18px" color={GOLD} fontWeight="bold">{number}</Text>
-            </Container>
-            <Container flexDirection="column" gap={4}>
-              <Text fontSize={16} lineHeight="20px" fontWeight="bold" color="#ffffff">{title}</Text>
-              <Text fontSize={14} lineHeight="19px" color={MUTED}>{copy}</Text>
-            </Container>
-          </Container>
-        ))}
-      </Panel>
+      <Label color={GOLD}>START HERE · 3 MINUTES</Label>
+      {steps.map(([number, title, copy]) => (
+        <ListRow key={number} glyph={number} title={title} detail={copy} accent={GOLD} height={s(72)} />
+      ))}
     </Container>
   );
 }
 
 function Hud() {
-  const width = useThree((state) => state.size.width);
-  const height = useThree((state) => state.size.height);
-  const compact = width < 920;
-  const phone = width < 640;
-  const short = height < 780 || phone;
+  const { compact, phone, s, listHeight } = useHudMetrics();
+  const short = phone;
   const [view, setView] = useState<View>("command");
   const [intent, setIntent] = useState("Map the safest BNB liquidity routes");
   const [pending, setPending] = useState(false);
@@ -965,6 +941,12 @@ function Hud() {
   const [activeMission, setActiveMission] = useState(seedMissions[0]);
   const [selected, setSelected] = useState<string[]>(["nexus", "vector", "aegis", "oracle"]);
   const [hovered, setHovered] = useState<string | null>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const currentNav = navigation.find(([id]) => id === view) ?? navigation[0];
+
+  useEffect(() => {
+    setMenuOpen(false);
+  }, [view]);
 
   useEffect(() => {
     fetch("/api/state")
@@ -1076,14 +1058,17 @@ function Hud() {
         setHovered={setHovered}
         setView={setView}
       />
-      <Fullscreen
-        pointerEvents={compact ? "auto" : "listener"}
-        flexDirection="column"
-        padding={phone ? 8 : compact ? 10 : 16}
-        gap={phone ? 8 : 10}
-        color="#ffffff"
-        overflow="hidden"
-      >
+      <DreiHud renderPriority={2}>
+        <OrthographicCamera makeDefault position={[0, 0, 100]} near={0.1} far={200} />
+        <Fullscreen
+          attachCamera
+          pointerEvents={compact ? "auto" : "listener"}
+          flexDirection="column"
+          padding={phone ? 8 : compact ? 10 : 16}
+          gap={phone ? 8 : 10}
+          color="#ffffff"
+          overflow="hidden"
+        >
         <Container
           height={phone ? 54 : 64}
           flexShrink={0}
@@ -1100,19 +1085,61 @@ function Hud() {
           <Container width={phone ? 32 : 38} height={phone ? 32 : 38} flexShrink={0} borderRadius={9} backgroundColor="#f3ba2f20" borderColor={GOLD} borderWidth={1} alignItems="center" justifyContent="center">
             <Text color={GOLD} fontSize={phone ? 16 : 19} lineHeight={phone ? "19px" : "23px"}>◆</Text>
           </Container>
-          <Container width={phone ? 120 : 210} height={40} flexShrink={0} flexDirection="column" justifyContent="center" gap={1}>
-            <Text fontSize={phone ? 15 : 17} lineHeight="20px" fontWeight="bold" letterSpacing={0.6} color="#ffffff">BINANCEFF2</Text>
-            {!phone && <Text fontSize={12} lineHeight="14px" letterSpacing={1.45} color={MUTED}>ORBITAL COMMAND</Text>}
-          </Container>
+          {!phone && (
+            <Container width={210} height={40} flexShrink={0} flexDirection="column" justifyContent="center" gap={1}>
+              <Text fontSize={17} lineHeight="20px" fontWeight="bold" letterSpacing={0.6} color="#ffffff">BINANCEFF2</Text>
+              <Text fontSize={12} lineHeight="14px" letterSpacing={1.45} color={MUTED}>ORBITAL COMMAND</Text>
+            </Container>
+          )}
           <Container flexGrow={1} />
           {!compact && <Container width={285} alignItems="flex-end"><Label color={GREEN}>● BNB NETWORK ONLINE · 142 UNITS</Label></Container>}
+          {compact && (
+            <Container
+              height={36}
+              paddingX={10}
+              flexShrink={0}
+              flexDirection="row"
+              alignItems="center"
+              gap={7}
+              borderRadius={7}
+              borderWidth={1}
+              borderColor={menuOpen ? GOLD : BORDER}
+              backgroundColor={menuOpen ? "#f3ba2f25" : "#09101bdd"}
+              cursor="pointer"
+              pointerEvents="auto"
+              pointerEventsOrder={24}
+              onClick={press(() => setMenuOpen((value) => !value))}
+            >
+              <Text width={16} textAlign="center" fontSize={13} lineHeight="16px" color={GOLD}>{currentNav[2]}</Text>
+              <Text width={phone ? 86 : 92} fontSize={12} lineHeight="15px" fontWeight="bold" color="#ffffff">{currentNav[1]}</Text>
+              <Text width={12} textAlign="center" fontSize={12} lineHeight="15px" color={GOLD}>{menuOpen ? "▴" : "▾"}</Text>
+            </Container>
+          )}
           <Ghost onClick={() => { window.location.href = "/"; }}>{phone ? "V1" : "V1 ↗"}</Ghost>
         </Container>
 
-        {compact && (
-          <Container height={phone ? 40 : 42} flexShrink={0} flexDirection="row" gap={6} overflow="scroll" scrollbarColor="#00000000" pointerEvents="auto">
+        {compact && menuOpen && (
+          <Container
+            flexShrink={0}
+            flexDirection="column"
+            gap={5}
+            padding={8}
+            backgroundColor="#050a12f5"
+            borderColor={BORDER}
+            borderWidth={1}
+            borderRadius={10}
+            pointerEvents="auto"
+          >
             {navigation.map(([id, label, glyph]) => (
-              <Ghost key={id} active={view === id} onClick={() => setView(id)}>{phone ? label : `${glyph} ${label}`}</Ghost>
+              <ListRow
+                key={id}
+                glyph={glyph}
+                title={label}
+                accent={GOLD}
+                active={view === id}
+                height={s(46)}
+                onSelect={() => setView(id)}
+              />
             ))}
           </Container>
         )}
@@ -1140,7 +1167,7 @@ function Hud() {
                   onClick={press(() => setView(id))}
                 >
                   <Text width={20} textAlign="center" fontSize={16} lineHeight="20px" color={view === id ? GOLD : "#7f91a9"}>{glyph}</Text>
-                  <Text fontSize={14} lineHeight="17px" fontWeight="bold" letterSpacing={0.65} color={view === id ? "#ffffff" : "#92a1b5"}>{label}</Text>
+                  <Text width={130} fontSize={14} lineHeight="17px" fontWeight="bold" letterSpacing={0.65} color={view === id ? "#ffffff" : "#92a1b5"}>{label}</Text>
                 </Container>
               ))}
               <Container flexGrow={1} />
@@ -1152,12 +1179,14 @@ function Hud() {
           )}
 
           <Container flexGrow={1} minWidth={0} minHeight={0} padding={compact ? 1 : 7} overflow="hidden" pointerEvents={compact ? "auto" : "listener"}>
-            {view === "command" && <Command compact={compact} phone={phone} short={short} intent={intent} setIntent={setIntent} deploy={deploy} pending={pending} missions={missions} openMission={openMission} setView={setView} hovered={hovered} selected={selected} setSelected={setSelected} />}
-            {view === "bounties" && <Bounties compact={compact} phone={phone} items={bounties} deploy={deploy} />}
-            {view === "agents" && <Agents compact={compact} phone={phone} selected={selected} setSelected={setSelected} setView={setView} />}
-            {view === "missions" && <MissionRoom key={activeMission.id} compact={compact} phone={phone} mission={activeMission} running={running} setRunning={setRunning} />}
-            {view === "vault" && <Vault compact={compact} phone={phone} wallet={wallet} connect={connect} technical={technical} setTechnical={setTechnical} />}
-            {view === "academy" && <Academy compact={compact} phone={phone} />}
+            <ScrollList height={listHeight(menuOpen)}>
+              {view === "command" && <Command compact={compact} phone={phone} short={short} intent={intent} setIntent={setIntent} deploy={deploy} pending={pending} missions={missions} openMission={openMission} setView={setView} hovered={hovered} selected={selected} setSelected={setSelected} />}
+              {view === "bounties" && <Bounties compact={compact} phone={phone} items={bounties} deploy={deploy} />}
+              {view === "agents" && <Agents compact={compact} phone={phone} selected={selected} setSelected={setSelected} setView={setView} />}
+              {view === "missions" && <MissionRoom key={activeMission.id} compact={compact} phone={phone} mission={activeMission} running={running} setRunning={setRunning} />}
+              {view === "vault" && <Vault compact={compact} phone={phone} wallet={wallet} connect={connect} technical={technical} setTechnical={setTechnical} />}
+              {view === "academy" && <Academy compact={compact} phone={phone} />}
+            </ScrollList>
           </Container>
         </Container>
 
@@ -1167,7 +1196,8 @@ function Hud() {
             <Label color={GOLD}>WEBGL HUD · ALT + 3</Label>
           </Container>
         )}
-      </Fullscreen>
+        </Fullscreen>
+      </DreiHud>
     </>
   );
 }
