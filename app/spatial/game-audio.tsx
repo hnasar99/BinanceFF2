@@ -13,6 +13,29 @@ export type GameAudio = {
 
 const GameAudioContext = createContext<GameAudio | null>(null);
 
+const silentAudio: GameAudio = {
+  started: false,
+  muted: true,
+  hover: () => undefined,
+  click: () => undefined,
+  deploy: () => undefined,
+  toggle: () => undefined,
+};
+
+function createGraph() {
+  const audio = new window.AudioContext();
+  const masterGain = audio.createGain();
+  const musicGain = audio.createGain();
+  const effectsGain = audio.createGain();
+  masterGain.gain.value = 0.9;
+  musicGain.gain.value = 0.28;
+  effectsGain.gain.value = 0.45;
+  musicGain.connect(masterGain);
+  effectsGain.connect(masterGain);
+  masterGain.connect(audio.destination);
+  return { audio, masterGain, musicGain, effectsGain };
+}
+
 export function GameAudioProvider({ children }: { children: ReactNode }) {
   const context = useRef<AudioContext | null>(null);
   const master = useRef<GainNode | null>(null);
@@ -22,8 +45,27 @@ export function GameAudioProvider({ children }: { children: ReactNode }) {
   const step = useRef(0);
   const startedRef = useRef(false);
   const mutedRef = useRef(false);
+  const alive = useRef(true);
   const [started, setStarted] = useState(false);
   const [muted, setMuted] = useState(false);
+
+  const ensure = useCallback(() => {
+    if (context.current && context.current.state === "closed") {
+      context.current = null;
+      master.current = null;
+      music.current = null;
+      effects.current = null;
+      startedRef.current = false;
+    }
+    if (!context.current) {
+      const graph = createGraph();
+      context.current = graph.audio;
+      master.current = graph.masterGain;
+      music.current = graph.musicGain;
+      effects.current = graph.effectsGain;
+    }
+    return context.current;
+  }, []);
 
   const tone = useCallback((frequency: number, duration: number, volume: number, type: OscillatorType, bus: GainNode, delay = 0) => {
     const audio = context.current;
@@ -43,31 +85,15 @@ export function GameAudioProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const start = useCallback(() => {
-    if (!context.current) {
-      const audio = new window.AudioContext();
-      const masterGain = audio.createGain();
-      const musicGain = audio.createGain();
-      const effectsGain = audio.createGain();
-      masterGain.gain.value = 0.9;
-      musicGain.gain.value = 0.28;
-      effectsGain.gain.value = 0.45;
-      musicGain.connect(masterGain);
-      effectsGain.connect(masterGain);
-      masterGain.connect(audio.destination);
-      context.current = audio;
-      master.current = masterGain;
-      music.current = musicGain;
-      effects.current = effectsGain;
-    }
-
-    void context.current.resume();
+    const audio = ensure();
+    void audio.resume().catch(() => undefined);
     if (startedRef.current) return;
     startedRef.current = true;
     setStarted(true);
     const bass = [55, 55, 82.41, 55, 65.41, 55, 73.42, 82.41];
     const arpeggio = [220, 277.18, 329.63, 415.3, 329.63, 277.18, 246.94, 329.63];
     const sequence = () => {
-      if (mutedRef.current || !music.current) return;
+      if (!alive.current || mutedRef.current || !music.current || !context.current || context.current.state === "closed") return;
       const beat = step.current % bass.length;
       tone(bass[beat], 0.24, beat % 4 === 0 ? 0.09 : 0.055, "triangle", music.current);
       if (beat % 2 === 0) tone(arpeggio[beat], 0.12, 0.018, "sine", music.current, 0.035);
@@ -75,8 +101,9 @@ export function GameAudioProvider({ children }: { children: ReactNode }) {
       step.current += 1;
     };
     sequence();
+    if (timer.current !== null) window.clearInterval(timer.current);
     timer.current = window.setInterval(sequence, 310);
-  }, [tone]);
+  }, [ensure, tone]);
 
   const hover = useCallback(() => {
     if (!startedRef.current || mutedRef.current || !effects.current) return;
@@ -84,11 +111,10 @@ export function GameAudioProvider({ children }: { children: ReactNode }) {
   }, [tone]);
 
   const click = useCallback(() => {
-    start();
-    if (!effects.current || mutedRef.current) return;
+    if (!startedRef.current || mutedRef.current || !effects.current) return;
     tone(250, 0.055, 0.055, "triangle", effects.current);
     tone(510, 0.075, 0.025, "sine", effects.current, 0.025);
-  }, [start, tone]);
+  }, [tone]);
 
   const deploy = useCallback(() => {
     start();
@@ -108,12 +134,23 @@ export function GameAudioProvider({ children }: { children: ReactNode }) {
     setMuted(next);
     const audio = context.current;
     const gain = master.current;
-    if (audio && gain) gain.gain.setTargetAtTime(next ? 0.0001 : 0.9, audio.currentTime, 0.045);
+    if (audio && audio.state !== "closed" && gain) gain.gain.setTargetAtTime(next ? 0.0001 : 0.9, audio.currentTime, 0.045);
   }, [start]);
 
-  useEffect(() => () => {
-    if (timer.current !== null) window.clearInterval(timer.current);
-    if (context.current && context.current.state !== "closed") void context.current.close();
+  useEffect(() => {
+    alive.current = true;
+    return () => {
+      alive.current = false;
+      if (timer.current !== null) window.clearInterval(timer.current);
+      timer.current = null;
+      const audio = context.current;
+      context.current = null;
+      master.current = null;
+      music.current = null;
+      effects.current = null;
+      startedRef.current = false;
+      if (audio && audio.state !== "closed") void audio.close().catch(() => undefined);
+    };
   }, []);
 
   const value = useMemo(() => ({ started, muted, hover, click, deploy, toggle }), [started, muted, hover, click, deploy, toggle]);
@@ -121,7 +158,5 @@ export function GameAudioProvider({ children }: { children: ReactNode }) {
 }
 
 export function useGameAudio(): GameAudio {
-  const audio = useContext(GameAudioContext);
-  if (!audio) throw new Error("useGameAudio must be used inside GameAudioProvider");
-  return audio;
+  return useContext(GameAudioContext) ?? silentAudio;
 }

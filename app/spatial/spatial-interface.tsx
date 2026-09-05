@@ -5,12 +5,11 @@ import {
   Billboard,
   ContactShadows,
   Grid,
-  Hud as DreiHud,
   Line,
   MeshReflectorMaterial,
-  OrthographicCamera,
   Sparkles,
   Stars,
+  Text as DreiText,
 } from "@react-three/drei";
 import { canvasInputProps, Container, Fullscreen, Text } from "@react-three/uikit";
 import { Button, Input, Progress } from "@react-three/uikit-default";
@@ -18,6 +17,8 @@ import type { VanillaInput } from "@react-three/uikit-default";
 import { ListCard, ListRow, ScrollList, press, useHudMetrics } from "./hud-kit";
 import { GameAudioProvider, useGameAudio } from "./game-audio";
 import { SpatialI18nProvider, useSpatialI18n } from "./i18n-context";
+import { useHudFontFamilies } from "./hud-font";
+import { preloadGamifiedEngine, useGamifiedProgress } from "./preload";
 import { languages, translate, type Locale } from "./i18n";
 import {
   EffectComposer,
@@ -109,7 +110,6 @@ function Panel({ children, ...props }: ComponentProps<typeof Container>) {
 function WorldLabel({
   color,
   children,
-  width = 176,
   active = false,
 }: {
   color: string;
@@ -119,25 +119,39 @@ function WorldLabel({
 }) {
   return (
     <Billboard follow>
-      <Container
-        pixelSize={0.0075}
-        width={width}
-        height={active ? 40 : 34}
-        backgroundColor="#050a12f2"
-        borderColor={color}
-        borderWidth={1}
-        borderRadius={8}
-        alignItems="center"
-        justifyContent="center"
-        paddingX={10}
-        pointerEvents="none"
+      <DreiText
+        font="/fonts/Inter-Medium.ttf"
+        fontSize={0.14}
+        color={active ? "#ffffff" : color}
+        anchorX="center"
+        anchorY="middle"
+        outlineWidth={0.018}
+        outlineColor="#050a12"
+        outlineOpacity={0.92}
+        depthOffset={-2}
       >
-        <Text fontSize={13} lineHeight="16px" fontWeight="bold" letterSpacing={1.15} color={active ? "#ffffff" : color}>
-          {children}
-        </Text>
-      </Container>
+        {children}
+      </DreiText>
     </Billboard>
   );
+}
+
+function DeckView({ active, children }: { active: boolean; children: ReactNode }) {
+  return (
+    <Container
+      display={active ? "flex" : "none"}
+      width="100%"
+      flexDirection="column"
+      flexShrink={0}
+      pointerEvents={active ? "auto" : "none"}
+    >
+      {children}
+    </Container>
+  );
+}
+
+function inspectAgent(id: string, setSelected: Dispatch<SetStateAction<string[]>>) {
+  setSelected((list) => list.includes(id) ? list : [...list, id]);
 }
 
 function Primary({ children, onClick, disabled = false }: { children: ReactNode; onClick: () => void; disabled?: boolean }) {
@@ -217,13 +231,13 @@ function LanguageSelector({ onSelect, phone }: { onSelect: (locale: Locale) => v
   const { locale } = useSpatialI18n();
   const audio = useGameAudio();
   return (
-    <Container height={40} flexShrink={0} flexDirection="row" gap={3} padding={3} backgroundColor="#07101bdd" borderColor={BORDER} borderWidth={1} borderRadius={7}>
+    <Container height={40} flexShrink={0} flexDirection="row" gap={3} padding={3} backgroundColor="#07101bdd" borderColor={BORDER} borderWidth={1} borderRadius={7} pointerEvents="auto" pointerEventsOrder={32}>
       {languages.map((language) => {
         const active = locale === language.id;
         return (
           <Container
             key={language.id}
-            width={phone ? 34 : 52}
+            width={phone ? 36 : 54}
             height={32}
             flexShrink={0}
             flexDirection="row"
@@ -232,11 +246,11 @@ function LanguageSelector({ onSelect, phone }: { onSelect: (locale: Locale) => v
             gap={5}
             cursor="pointer"
             pointerEvents="auto"
-            pointerEventsOrder={30}
+            pointerEventsOrder={34}
             borderRadius={5}
             borderWidth={1}
-            borderColor={active ? GOLD : "#00000000"}
-            backgroundColor={active ? "#f3ba2f22" : "#00000000"}
+            borderColor={active ? GOLD : BORDER}
+            backgroundColor={active ? "#f3ba2f33" : "#0d1828"}
             hover={{ backgroundColor: "#1b2d48", borderColor: CYAN, transformTranslateZ: 5 }}
             active={{ transformScale: 0.94 }}
             onHoverChange={(hovered) => { if (hovered) audio.hover(); }}
@@ -309,7 +323,7 @@ function Nebula() {
     `,
   }), []);
   return (
-    <mesh scale={48}>
+    <mesh scale={48} raycast={() => null}>
       <sphereGeometry args={[1, 48, 32]} />
       <shaderMaterial ref={material} side={THREE.BackSide} depthWrite={false} {...shader} />
     </mesh>
@@ -575,6 +589,7 @@ function CameraDirector({ view, compact }: { view: View; compact: boolean }) {
   }, [compact]);
 
   useFrame((_, delta) => {
+    if (!(camera instanceof THREE.PerspectiveCamera)) return;
     const destination = targets[view];
     const alpha = 1 - Math.exp(-delta * 1.8);
     camera.position.lerp(destination.position, alpha);
@@ -640,7 +655,7 @@ function World({
         fadeStrength={1.5}
         infiniteGrid
       />
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[3, -0.9, -2]} receiveShadow>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[3, -0.9, -2]} receiveShadow raycast={() => null}>
         <planeGeometry args={[40, 40]} />
         <MeshReflectorMaterial
           resolution={1024}
@@ -674,7 +689,7 @@ function World({
           showLabel={!compact}
           onHover={(active) => setHovered(active ? agent.id : null)}
           onSelect={() => {
-            setSelected((list) => list.includes(agent.id) ? list.filter((id) => id !== agent.id) : [...list, agent.id]);
+            inspectAgent(agent.id, setSelected);
             setView("agents");
           }}
         />
@@ -769,7 +784,7 @@ function Command({ compact, phone, short, intent, setIntent, deploy, pending, mi
                 pointerEventsOrder={20}
                 cursor="pointer"
                 onClick={press(() => {
-                  setSelected((list) => list.includes(agent.id) ? list.filter((id) => id !== agent.id) : [...list, agent.id]);
+                  inspectAgent(agent.id, setSelected);
                   setView("agents");
                 })}
               >
@@ -838,7 +853,7 @@ function Command({ compact, phone, short, intent, setIntent, deploy, pending, mi
                 pointerEvents="auto"
                 pointerEventsOrder={20}
                 onClick={press(() => {
-                  setSelected((list) => list.includes(agent.id) ? list.filter((id) => id !== agent.id) : [...list, agent.id]);
+                  inspectAgent(agent.id, setSelected);
                   setView("agents");
                 })}
               >
@@ -1057,6 +1072,7 @@ function Hud() {
   const { compact, phone, s, listHeight } = useHudMetrics();
   const audio = useGameAudio();
   const { setLocale, t } = useSpatialI18n();
+  const fontFamilies = useHudFontFamilies();
   const intentInput = useRef<VanillaInput | null>(null);
   const short = phone;
   const [view, setView] = useState<View>("command");
@@ -1077,7 +1093,7 @@ function Hud() {
 
   const goTo = useCallback((next: View) => {
     const label = navigation.find(([id]) => id === next)?.[1] || next.toUpperCase();
-    audio.click();
+    audio.hover();
     setView(next);
     setMenuOpen(false);
     setLastAction(`${t(label)} · ${t("DECK ONLINE")}`);
@@ -1248,16 +1264,19 @@ function Hud() {
         setHovered={(id) => { if (id) audio.hover(); setHovered(id); }}
         setView={goTo}
       />
-      <DreiHud renderPriority={2}>
-        <OrthographicCamera makeDefault position={[0, 0, 100]} near={0.1} far={200} />
         <Fullscreen
           attachCamera
-          pointerEvents={compact ? "auto" : "listener"}
+          distanceToCamera={0.35}
+          depthTest={false}
+          pointerEvents="auto"
           flexDirection="column"
           padding={phone ? 8 : compact ? 10 : 16}
           gap={phone ? 8 : 10}
           color="#ffffff"
           overflow="hidden"
+          fontFamilies={fontFamilies}
+          fontFamily="inter"
+          fontWeight="medium"
         >
         <Container
           height={phone ? 54 : 64}
@@ -1271,6 +1290,7 @@ function Hud() {
           borderWidth={1}
           borderRadius={10}
           pointerEvents="auto"
+          pointerEventsOrder={28}
         >
           <Container width={phone ? 32 : 38} height={phone ? 32 : 38} flexShrink={0} borderRadius={9} backgroundColor="#f3ba2f20" borderColor={GOLD} borderWidth={1} alignItems="center" justifyContent="center">
             <Text color={GOLD} fontSize={phone ? 16 : 19} lineHeight={phone ? "19px" : "23px"}>◆</Text>
@@ -1383,14 +1403,26 @@ function Hud() {
             </Container>
           )}
 
-          <Container flexGrow={1} minWidth={0} minHeight={0} padding={compact ? 1 : 7} overflow="hidden" pointerEvents={compact ? "auto" : "listener"}>
+          <Container flexGrow={1} minWidth={0} minHeight={0} padding={compact ? 1 : 7} overflow="hidden" pointerEvents="auto">
             <ScrollList height={listHeight(menuOpen)}>
-              {view === "command" && <Command compact={compact} phone={phone} short={short} intent={intent} setIntent={setIntent} deploy={deploy} pending={pending} missions={missions} openMission={openMission} setView={goTo} hovered={hovered} selected={selected} setSelected={setSelected} registerIntentInput={(input) => { intentInput.current = input; }} />}
-              {view === "bounties" && <Bounties compact={compact} phone={phone} items={bounties} deploy={deploy} />}
-              {view === "agents" && <Agents compact={compact} phone={phone} selected={selected} setSelected={setSelected} setView={goTo} />}
-              {view === "missions" && <MissionRoom key={activeMission.id} compact={compact} phone={phone} mission={activeMission} running={running} setRunning={setRunning} />}
-              {view === "vault" && <Vault compact={compact} phone={phone} wallet={wallet} connect={connect} technical={technical} setTechnical={setTechnical} />}
-              {view === "academy" && <Academy compact={compact} phone={phone} />}
+              <DeckView active={view === "command"}>
+                <Command compact={compact} phone={phone} short={short} intent={intent} setIntent={setIntent} deploy={deploy} pending={pending} missions={missions} openMission={openMission} setView={goTo} hovered={hovered} selected={selected} setSelected={setSelected} registerIntentInput={(input) => { intentInput.current = input; }} />
+              </DeckView>
+              <DeckView active={view === "bounties"}>
+                <Bounties compact={compact} phone={phone} items={bounties} deploy={deploy} />
+              </DeckView>
+              <DeckView active={view === "agents"}>
+                <Agents compact={compact} phone={phone} selected={selected} setSelected={setSelected} setView={goTo} />
+              </DeckView>
+              <DeckView active={view === "missions"}>
+                <MissionRoom compact={compact} phone={phone} mission={activeMission} running={running} setRunning={setRunning} />
+              </DeckView>
+              <DeckView active={view === "vault"}>
+                <Vault compact={compact} phone={phone} wallet={wallet} connect={connect} technical={technical} setTechnical={setTechnical} />
+              </DeckView>
+              <DeckView active={view === "academy"}>
+                <Academy compact={compact} phone={phone} />
+              </DeckView>
             </ScrollList>
           </Container>
         </Container>
@@ -1402,7 +1434,6 @@ function Hud() {
           </Container>
         )}
         </Fullscreen>
-      </DreiHud>
     </>
   );
 }
@@ -1446,31 +1477,50 @@ const Hangar = memo(function Hangar({
   );
 });
 
-export function SpatialInterface() {
+function SpatialBoot() {
+  const progress = useGamifiedProgress();
+  useEffect(() => {
+    void preloadGamifiedEngine();
+  }, []);
+  if (progress.ready) return <SpatialScene />;
+  return (
+    <main className="spatial-shell spatial-boot" aria-label="Loading gamified spatial interface">
+      <span>LOADING GAMIFIED EXPERIENCE</span>
+      <b>{progress.percent}%</b>
+      <em style={{ width: `${progress.percent}%` }} />
+    </main>
+  );
+}
+
+function SpatialScene() {
   return (
     <SpatialI18nProvider>
-    <GameAudioProvider>
-    <main className="spatial-shell" aria-label="BinanceFF2 cinematic spatial command interface">
-      <Canvas
-        {...canvasInputProps}
-        shadows
-        dpr={[1, 1.75]}
-        camera={{ position: [0, 2.2, 13.8], fov: 42 }}
-        gl={{ antialias: true, alpha: false, localClippingEnabled: true, powerPreference: "high-performance" }}
-        onCreated={({ gl }) => {
-          gl.outputColorSpace = THREE.SRGBColorSpace;
-          gl.toneMapping = THREE.ACESFilmicToneMapping;
-          gl.toneMappingExposure = 0.92;
-          gl.shadowMap.enabled = true;
-          gl.shadowMap.type = THREE.PCFSoftShadowMap;
-        }}
-      >
-        <Suspense fallback={null}>
-          <Hud />
-        </Suspense>
-      </Canvas>
-    </main>
-    </GameAudioProvider>
+      <GameAudioProvider>
+        <main className="spatial-shell" aria-label="BinanceFF2 cinematic spatial command interface">
+          <Canvas
+            {...canvasInputProps}
+            shadows
+            dpr={[1, 1.75]}
+            camera={{ position: [0, 2.2, 13.8], fov: 42, near: 0.1, far: 80 }}
+            gl={{ antialias: true, alpha: false, localClippingEnabled: true, powerPreference: "high-performance" }}
+            onCreated={({ gl }) => {
+              gl.outputColorSpace = THREE.SRGBColorSpace;
+              gl.toneMapping = THREE.ACESFilmicToneMapping;
+              gl.toneMappingExposure = 0.92;
+              gl.shadowMap.enabled = true;
+              gl.shadowMap.type = THREE.PCFSoftShadowMap;
+            }}
+          >
+            <Suspense fallback={null}>
+              <Hud />
+            </Suspense>
+          </Canvas>
+        </main>
+      </GameAudioProvider>
     </SpatialI18nProvider>
   );
+}
+
+export function SpatialInterface() {
+  return <SpatialBoot />;
 }

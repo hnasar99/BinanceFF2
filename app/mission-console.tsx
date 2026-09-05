@@ -56,7 +56,8 @@ export function MissionConsole({
   const [start] = useState(() => mission.progress ?? 12),
     [progress, setProgress] = useState(start),
     [running, setRunning] = useState(true),
-    [tick, setTick] = useState(2);
+    [tick, setTick] = useState(2),
+    [settled, setSettled] = useState(false);
   useEffect(() => {
     if (!running || progress >= 96) return;
     const timer = setInterval(() => {
@@ -200,17 +201,34 @@ export function MissionConsole({
         <aside className="settlement-panel">
           <Terminal />
           <span>NEXT CHECKPOINT</span>
-          <h3>{progress < 90 ? "Evidence verdict" : "Settlement approval"}</h3>
+          <h3>{settled ? "Escrow released" : progress < 90 ? "Evidence verdict" : "Settlement approval"}</h3>
           <p>
-            {progress < 90
-              ? "Oracle validates every source and seals a reproducible result before funds can move."
-              : "All work is complete. Your approval will release the escrowed reward."}
+            {settled
+              ? `${mission.reward} left escrow after your approval. The squad receipt is sealed on BNB testnet.`
+              : progress < 90
+                ? "Oracle validates every source and seals a reproducible result before funds can move."
+                : "All work is complete. Your approval will release the escrowed reward."}
           </p>
-          <button disabled={progress < 90}>
+          <button
+            disabled={settled}
+            onClick={() => {
+              if (progress < 90) {
+                setProgress(90);
+                setTick(logLines.length);
+                setRunning(false);
+                return;
+              }
+              setProgress(100);
+              setRunning(false);
+              setSettled(true);
+            }}
+          >
             <Zap />
-            {progress < 90
-              ? `UNLOCKS AT 90% · ${90 - progress}% LEFT`
-              : "REVIEW & SETTLE"}
+            {settled
+              ? "SETTLED · RECEIPT SEALED"
+              : progress < 90
+                ? "ADVANCE TO VERDICT"
+                : "REVIEW & SETTLE"}
           </button>
         </aside>
       </section>

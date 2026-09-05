@@ -29,6 +29,8 @@ import {
   X,
   Zap,
 } from "lucide-react";
+import { GamifiedEntry } from "./gamified-entry";
+import { getGamifiedProgress, preloadGamifiedEngine } from "./spatial/preload";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
@@ -365,14 +367,7 @@ function Header({
         <b>{title.toUpperCase()}</b>
       </div>
       <div className="top-actions">
-        <a
-          className="spatial-entry"
-          href="/spatial"
-          title="Enter spatial interface (Alt + 3)"
-          aria-label="Enter 3D spatial interface"
-        >
-          3D
-        </a>
+        <GamifiedEntry />
         <label>
           <Search />
           <input aria-label="Search" placeholder="Search agents, bounties..." />
@@ -439,6 +434,7 @@ function CommandCenter({
                 </button>
               ),
             )}
+            <GamifiedEntry compact />
           </div>
         </div>
         <div className="agent-orbit" aria-label="Agent network visualization">
@@ -635,14 +631,17 @@ function CommandCenter({
   );
 }
 
-function AgentsView() {
+function AgentsView({ navigate }: { navigate: (view: string) => void }) {
   const [query, setQuery] = useState("");
+  const [classFilter, setClassFilter] = useState<"all" | "bnb" | "rating">("all");
   const [selected, setSelected] = useState<number[]>([]);
-  const filtered = agents.filter((a) =>
-    (a.name + a.role + a.skills.join(" "))
-      .toLowerCase()
-      .includes(query.toLowerCase()),
-  );
+  const filtered = agents.filter((a) => {
+    const haystack = `${a.name} ${a.role} ${a.skills.join(" ")}`.toLowerCase();
+    if (!haystack.includes(query.toLowerCase())) return false;
+    if (classFilter === "bnb") return a.skills.some((skill) => skill.toLowerCase().includes("bnb"));
+    if (classFilter === "rating") return a.score >= 9.6;
+    return true;
+  });
   return (
     <div className="page">
       <div className="page-title">
@@ -654,7 +653,7 @@ function AgentsView() {
             verified mission history.
           </p>
         </div>
-        <Button className="deploy-btn">
+        <Button className="deploy-btn" onClick={() => navigate("tutor")}>
           <Plus /> PUBLISH AGENT
         </Button>
       </div>
@@ -667,9 +666,9 @@ function AgentsView() {
             placeholder="Search capabilities, roles, tools..."
           />
         </label>
-        <button>ALL CLASSES</button>
-        <button>BNB CHAIN</button>
-        <button>RATING 9+</button>
+        <button className={classFilter === "all" ? "active" : ""} onClick={() => setClassFilter("all")}>ALL CLASSES</button>
+        <button className={classFilter === "bnb" ? "active" : ""} onClick={() => setClassFilter("bnb")}>BNB CHAIN</button>
+        <button className={classFilter === "rating" ? "active" : ""} onClick={() => setClassFilter("rating")}>RATING 9+</button>
         <span>{filtered.length} agents</span>
       </div>
       <section className="agents-grid">
@@ -702,7 +701,7 @@ function AgentsView() {
           <Button onClick={() => setSelected([])} variant="outline">
             CLEAR
           </Button>
-          <Button className="deploy-btn">
+          <Button className="deploy-btn" onClick={() => navigate("teams")}>
             BUILD SQUAD <ArrowRight />
           </Button>
         </div>
@@ -1215,6 +1214,7 @@ function TutorView() {
 
 function WalletView() {
   const [authorized, setAuthorized] = useState(true);
+  const [walletAction, setWalletAction] = useState("");
   return (
     <div className="page">
       <div className="page-title">
@@ -1226,7 +1226,7 @@ function WalletView() {
             verifiable receipt.
           </p>
         </div>
-        <Button className="deploy-btn">
+        <Button className="deploy-btn" onClick={() => setWalletAction("Testnet top-up queued · 2.00 tBNB")}>
           <Plus /> ADD FUNDS
         </Button>
       </div>
@@ -1238,10 +1238,11 @@ function WalletView() {
           </h2>
           <b>$7,861.22 USD</b>
           <div>
-            <button>SEND</button>
-            <button>RECEIVE</button>
-            <button>SWAP</button>
+            <button onClick={() => setWalletAction("Send stays locked until a mandate is approved.")}>SEND</button>
+            <button onClick={() => setWalletAction("Receive address copied for BSC Testnet.")}>RECEIVE</button>
+            <button onClick={() => setWalletAction("Swap preview: 0.40 BNB → 248 USDT (simulate only).")}>SWAP</button>
           </div>
+          {walletAction && <small>{walletAction}</small>}
         </article>
         <article>
           <span>IN ESCROW</span>
@@ -1334,9 +1335,11 @@ export default function Home() {
     [active],
   );
   useEffect(() => {
+    void preloadGamifiedEngine();
     const openSpatial = (event: KeyboardEvent) => {
       if (event.altKey && (event.code === "Digit3" || event.key === "3")) {
         event.preventDefault();
+        if (!getGamifiedProgress().ready) return;
         window.location.assign("/spatial");
       }
     };
@@ -1363,7 +1366,7 @@ export default function Home() {
             onBack={() => setActive("command")}
           />
         )}
-        {active === "agents" && <AgentsView />}
+        {active === "agents" && <AgentsView navigate={setActive} />}
         {active === "bounties" && <BountiesView openConsole={openConsole} />}
         {active === "teams" && <TeamsView openConsole={openConsole} />}
         {active === "arena" && <ArenaView />}

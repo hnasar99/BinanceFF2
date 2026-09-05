@@ -34,17 +34,20 @@ export function useHudMetrics(): HudMetrics {
       : 1;
   const s = (n: number) => Math.max(11, Math.round(n * scale));
   const listHeight = (menuOpen = false) => {
-    const chrome =
-      (phone ? 62 : compact ? 78 : 116) +
-      (menuOpen && compact ? 6 * s(46) + 28 : 0);
-    return Math.max(200, Math.floor(height - chrome));
+    const topbar = phone ? 54 : 64;
+    const footer = compact ? 0 : 26;
+    const pad = (phone ? 8 : compact ? 10 : 16) * 2;
+    const gaps = (phone ? 8 : 10) * (menuOpen && compact ? 3 : 2);
+    const menu = menuOpen && compact ? 6 * s(46) + 28 : 0;
+    return Math.max(160, Math.floor(height - topbar - footer - pad - gaps - menu));
   };
   return { width, height, compact, phone, scale, s, listHeight };
 }
 
 export function press(handler: () => void) {
-  return (event: { stopPropagation: () => void }) => {
-    event.stopPropagation();
+  return (event?: { stopPropagation?: () => void; stopImmediatePropagation?: () => void }) => {
+    event?.stopPropagation?.();
+    event?.stopImmediatePropagation?.();
     handler();
   };
 }
@@ -72,7 +75,7 @@ export function ScrollList({
       scrollbarColor="#5a6b84"
       scrollbarBorderRadius={4}
       pointerEvents="auto"
-      pointerEventsOrder={12}
+      pointerEventsOrder={8}
     >
       {children}
     </Container>
@@ -111,6 +114,7 @@ export function ListRow({
       backgroundColor={active ? `${accent}22` : "#0a1220ee"}
       cursor={onSelect ? "pointer" : "default"}
       pointerEvents="auto"
+      pointerEventsOrder={22}
       hover={onSelect ? { borderColor: accent, backgroundColor: "#152239" } : undefined}
       onClick={onSelect ? press(onSelect) : undefined}
     >
@@ -145,6 +149,7 @@ export function ListCard({
       backgroundColor={PANEL}
       overflow="visible"
       pointerEvents="auto"
+      pointerEventsOrder={22}
       hover={onClick ? { borderColor: GOLD, transformTranslateZ: 4 } : undefined}
       onClick={onClick ? press(onClick) : undefined}
       {...props}
