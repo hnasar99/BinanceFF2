@@ -2,6 +2,7 @@
 
 import { useThree } from "@react-three/fiber";
 import { Container, Text } from "@react-three/uikit";
+import { useEffect } from "react";
 import type { ComponentProps, ReactNode } from "react";
 
 export const GOLD = "#f3ba2f";
@@ -22,6 +23,20 @@ export type HudMetrics = {
   listHeight: (menuOpen?: boolean) => number;
 };
 
+function unlockSpatialTextInputs() {
+  const unlock = () => {
+    document.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>("input[maxlength], textarea[maxlength]").forEach((element) => {
+      const current = Number(element.getAttribute("maxlength") || 0);
+      if (!current || current <= 64) element.removeAttribute("maxlength");
+    });
+  };
+
+  unlock();
+  const observer = new MutationObserver(unlock);
+  observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ["maxlength"] });
+  return () => observer.disconnect();
+}
+
 export function useHudMetrics(): HudMetrics {
   const width = useThree((state) => state.size.width);
   const height = useThree((state) => state.size.height);
@@ -41,6 +56,9 @@ export function useHudMetrics(): HudMetrics {
     const menu = menuOpen && compact ? 6 * s(46) + 28 : 0;
     return Math.max(160, Math.floor(height - topbar - footer - pad - gaps - menu));
   };
+
+  useEffect(() => unlockSpatialTextInputs(), []);
+
   return { width, height, compact, phone, scale, s, listHeight };
 }
 
