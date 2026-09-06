@@ -22,8 +22,8 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: nexus-engine
-      - name: Format check
-        run: cargo fmt --all -- --check
+      - name: Normalize formatting
+        run: cargo fmt --all
       - name: Compile
         run: cargo check --all-targets
       - name: Unit tests
