@@ -130,8 +130,9 @@ fn decide(candidate: &ShadowCandidateInput, policy: &ShadowPolicy) -> ShadowDeci
 }
 
 fn parse_chain_configs() -> Vec<ChainConfig> {
-    let raw = env::var("NEXUS_CHAINS").unwrap_or_default();
-    raw.split(';')
+    env::var("NEXUS_CHAINS")
+        .unwrap_or_default()
+        .split(';')
         .filter_map(|entry| {
             let entry = entry.trim();
             if entry.is_empty() {
@@ -163,16 +164,14 @@ async fn run_chain_sentinel(config: ChainConfig, state: AppState) {
             &state,
             "chain.connecting",
             Some(&config.name),
-            serde_json::json!({ "transport": "websocket" }),
+            serde_json::json!({"transport":"websocket"}),
         );
 
         let result = async {
-            let ws = WsConnect::new(config.ws_url.clone());
             let provider = ProviderBuilder::new()
-                .connect_ws(ws)
+                .connect_ws(WsConnect::new(config.ws_url.clone()))
                 .await
                 .context("websocket provider connection failed")?;
-
             let subscription = provider
                 .subscribe_blocks()
                 .await
@@ -183,22 +182,21 @@ async fn run_chain_sentinel(config: ChainConfig, state: AppState) {
                 let mut metrics = state.metrics.write().await;
                 metrics.chains_connected += 1;
             }
-
             emit(
                 &state,
                 "chain.connected",
                 Some(&config.name),
-                serde_json::json!({ "transport": "websocket" }),
+                serde_json::json!({"transport":"websocket"}),
             );
-
             info!(chain = %config.name, "sentinel connected");
 
             while let Some(header) = stream.next().await {
                 let now = Utc::now();
                 let block_number = header.number;
-                let block_timestamp_ms = (header.timestamp as i64).saturating_mul(1000);
-                let block_age_ms = now.timestamp_millis().saturating_sub(block_timestamp_ms).max(0);
-
+                let block_age_ms = now
+                    .timestamp_millis()
+                    .saturating_sub((header.timestamp as i64).saturating_mul(1000))
+                    .max(0);
                 {
                     let mut metrics = state.metrics.write().await;
                     metrics.blocks_observed += 1;
@@ -209,7 +207,6 @@ async fn run_chain_sentinel(config: ChainConfig, state: AppState) {
                         .last_block_age_ms_by_chain
                         .insert(config.name.clone(), block_age_ms);
                 }
-
                 emit(
                     &state,
                     "chain.block.observed",
@@ -219,11 +216,10 @@ async fn run_chain_sentinel(config: ChainConfig, state: AppState) {
                         "blockTimestamp": header.timestamp,
                         "observedAt": now,
                         "blockAgeMs": block_age_ms,
-                        "note": "blockAgeMs is a coarse wall-clock freshness indicator, not wire latency"
+                        "note": "coarse wall-clock freshness indicator, not wire latency"
                     }),
                 );
             }
-
             anyhow::Ok(())
         }
         .await;
@@ -232,7 +228,6 @@ async fn run_chain_sentinel(config: ChainConfig, state: AppState) {
             let mut metrics = state.metrics.write().await;
             metrics.chains_connected = metrics.chains_connected.saturating_sub(1);
         }
-
         match result {
             Ok(()) => warn!(chain = %config.name, "sentinel stream ended; reconnecting"),
             Err(err) => {
@@ -241,30 +236,28 @@ async fn run_chain_sentinel(config: ChainConfig, state: AppState) {
                     &state,
                     "chain.error",
                     Some(&config.name),
-                    serde_json::json!({ "error": err.to_string(), "retryInMs": 2000 }),
+                    serde_json::json!({"error":err.to_string(),"retryInMs":2000}),
                 );
             }
         }
-
         tokio::time::sleep(std::time::Duration::from_secs(2)).await;
     }
 }
 
 async fn health(State(state): State<AppState>) -> impl IntoResponse {
-    let metrics = state.metrics.read().await.clone();
     Json(serde_json::json!({
-        "status": "ok",
-        "service": "nexus-engine",
-        "mode": "SHADOW_NO_BROADCAST",
-        "policy": {
-            "minNetProfitUsd": state.policy.min_net_profit_usd,
-            "minConfidence": state.policy.min_confidence
+        "status":"ok",
+        "service":"nexus-engine",
+        "mode":"SHADOW_NO_BROADCAST",
+        "policy":{
+            "minNetProfitUsd":state.policy.min_net_profit_usd,
+            "minConfidence":state.policy.min_confidence
         },
-        "metrics": metrics
+        "metrics":state.metrics.read().await.clone()
     }))
 }
 
-async fn metrics(State(state): State<AppState>) -> impl IntoResponse {
+async fn metrics_handler(State(state): State<AppState>) -> impl IntoResponse {
     Json(state.metrics.read().await.clone())
 }
 
@@ -279,13 +272,12 @@ async fn submit_shadow_candidate(
     {
         return (
             StatusCode::BAD_REQUEST,
-            Json(serde_json::json!({ "error": "invalid candidate" })),
+            Json(serde_json::json!({"error":"invalid candidate"})),
         )
             .into_response();
     }
 
     let decision = decide(&candidate, &state.policy);
-
     {
         let mut metrics = state.metrics.write().await;
         metrics.candidates_received += 1;
@@ -302,12 +294,11 @@ async fn submit_shadow_candidate(
         "market.opportunity.detected",
         Some(&candidate.chain),
         serde_json::json!({
-            "route": candidate.route,
-            "grossProfitUsd": candidate.expected_gross_profit_usd,
-            "confidence": candidate.confidence
+            "route":candidate.route,
+            "grossProfitUsd":candidate.expected_gross_profit_usd,
+            "confidence":candidate.confidence
         }),
     );
-
     emit(
         &state,
         if decision.approved {
@@ -319,7 +310,11 @@ async fn submit_shadow_candidate(
         serde_json::to_value(&decision).unwrap_or_else(|_| serde_json::json!({})),
     );
 
-    (StatusCode::OK, Json(serde_json::to_value(decision).unwrap())).into_response()
+    (
+        StatusCode::OK,
+        Json(serde_json::to_value(decision).unwrap()),
+    )
+        .into_response()
 }
 
 async fn events(
@@ -334,7 +329,6 @@ async fn events(
             Err(_) => None,
         }
     });
-
     Sse::new(stream).keep_alive(axum::response::sse::KeepAlive::default())
 }
 
@@ -342,7 +336,9 @@ async fn events(
 async fn main() -> Result<()> {
     dotenvy::dotenv().ok();
     tracing_subscriber::fmt()
-        .with_env_filter(EnvFilter::try_from_default_env().unwrap_or_else(|_| "nexus_engine=info,info".into()))
+        .with_env_filter(
+            EnvFilter::try_from_default_env().unwrap_or_else(|_| "nexus_engine=info,info".into()),
+        )
         .init();
 
     let chains = parse_chain_configs();
@@ -356,17 +352,15 @@ async fn main() -> Result<()> {
             .and_then(|v| v.parse().ok())
             .unwrap_or(0.80),
     };
-
     let (events_tx, _) = broadcast::channel(4096);
-    let metrics = Arc::new(RwLock::new(Metrics {
+    let runtime_metrics = Arc::new(RwLock::new(Metrics {
         started_at: Some(Utc::now()),
         chains_configured: chains.len(),
         ..Metrics::default()
     }));
-
     let state = AppState {
         events: events_tx,
-        metrics,
+        metrics: runtime_metrics,
         policy,
     };
 
@@ -375,19 +369,18 @@ async fn main() -> Result<()> {
         "engine.started",
         None,
         serde_json::json!({
-            "chains": chains.iter().map(|c| c.name.clone()).collect::<Vec<_>>(),
-            "liveExecution": false,
-            "broadcastEnabled": false
+            "chains":chains.iter().map(|c| c.name.clone()).collect::<Vec<_>>(),
+            "liveExecution":false,
+            "broadcastEnabled":false
         }),
     );
-
     for chain in chains {
         tokio::spawn(run_chain_sentinel(chain, state.clone()));
     }
 
     let app = Router::new()
         .route("/health", get(health))
-        .route("/metrics", get(metrics))
+        .route("/metrics", get(metrics_handler))
         .route("/events", get(events))
         .route("/shadow/candidates", post(submit_shadow_candidate))
         .layer(CorsLayer::permissive())
@@ -399,7 +392,6 @@ async fn main() -> Result<()> {
         .and_then(|v| v.parse::<u16>().ok())
         .unwrap_or(8788);
     let addr: SocketAddr = format!("{host}:{port}").parse()?;
-
     let listener = tokio::net::TcpListener::bind(addr).await?;
     info!(%addr, "NEXUS shadow engine online");
     axum::serve(listener, app).await?;
@@ -426,7 +418,10 @@ mod tests {
 
     #[test]
     fn approves_profitable_candidate() {
-        let policy = ShadowPolicy { min_net_profit_usd: 10.0, min_confidence: 0.8 };
+        let policy = ShadowPolicy {
+            min_net_profit_usd: 10.0,
+            min_confidence: 0.8,
+        };
         let decision = decide(&candidate(40.0, 0.95), &policy);
         assert!(decision.approved);
         assert!((decision.expected_net_profit_usd - 25.0).abs() < f64::EPSILON);
@@ -434,7 +429,10 @@ mod tests {
 
     #[test]
     fn rejects_low_profit_candidate() {
-        let policy = ShadowPolicy { min_net_profit_usd: 10.0, min_confidence: 0.8 };
+        let policy = ShadowPolicy {
+            min_net_profit_usd: 10.0,
+            min_confidence: 0.8,
+        };
         let decision = decide(&candidate(20.0, 0.95), &policy);
         assert!(!decision.approved);
         assert!((decision.expected_net_profit_usd - 5.0).abs() < f64::EPSILON);
@@ -442,7 +440,10 @@ mod tests {
 
     #[test]
     fn rejects_low_confidence_candidate() {
-        let policy = ShadowPolicy { min_net_profit_usd: 10.0, min_confidence: 0.8 };
+        let policy = ShadowPolicy {
+            min_net_profit_usd: 10.0,
+            min_confidence: 0.8,
+        };
         let decision = decide(&candidate(100.0, 0.4), &policy);
         assert!(!decision.approved);
         assert!(decision.reason.contains("confidence"));
