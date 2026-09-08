@@ -1,7 +1,10 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { KaiAvatarPreview } from "./kai-avatar-preview";
+import { useEffect, useMemo, useState } from "react";
+import { AGENT_LINES, DEPLOY_LINE, voiceProfile } from "@/lib/agent-voice";
+import { playAgentSpeech, stopAgentSpeech, type VoicePlayMeta } from "./agent-speaker";
+import { AgentAura } from "./agent-aura";
+import { SpeakingPortrait, type SpeechCue } from "./speaking-portrait";
 
 type Agent = {
   id: string;
@@ -13,35 +16,55 @@ type Agent = {
   traits: string[];
   stats: string[];
   line: string;
+  portrait: string;
+  auraRate: number;
+  mouthLine: number;
 };
 
 const AGENTS: Agent[] = [
-  { id: "scout", name: "KAI", role: "SCOUT", level: 18, accent: "#40d7ff", short: "Explore · Discover · Alert", traits: ["Fast", "Wide", "Curious"], stats: ["1,248 contracts scanned", "37 opportunities found", "94% signal accuracy"], line: "Commander, I found an unusual liquidity movement on Arbitrum." },
-  { id: "analyst", name: "LYRA", role: "ANALYST", level: 24, accent: "#a78bfa", short: "Decode · Research · Score", traits: ["Deep", "Precise", "Rigorous"], stats: ["412 protocols analyzed", "128 risk reports", "96% analysis success"], line: "The route is viable, but the edge disappears above twenty eight thousand dollars." },
-  { id: "commander", name: "ORION", role: "COMMANDER", level: 32, accent: "#f3ba2f", short: "Orchestrate · Adapt · Evolve", traits: ["Strategic", "Vision", "Leadership"], stats: ["184 missions created", "$47,320 total earned", "92% mission success"], line: "Scout found the signal. Analyst validated it. Strategist, build the optimal route." },
-  { id: "strategist", name: "NOVA", role: "STRATEGIST", level: 21, accent: "#8f7cff", short: "Plan · Simulate · Optimize", traits: ["Smart", "Adaptive", "Efficient"], stats: ["1,024 simulations", "317 optimized routes", "68% higher average ROI"], line: "Optimal route ready. USDC to WETH on Camelot, exit through Uniswap, projected profit forty two dollars." },
-  { id: "executor", name: "REX", role: "EXECUTOR", level: 27, accent: "#ff5151", short: "Trade · Deploy · Settle", traits: ["Atomic", "Reliable", "Profitable"], stats: ["846 transactions", "$124,882 profit generated", "99.1% execution success"], line: "Route confirmed. Nonce locked. Execution engine standing by." },
-  { id: "guardian", name: "AEGIS", role: "GUARDIAN", level: 19, accent: "#50e3a4", short: "Protect · Monitor · Balance", traits: ["Secure", "Alert", "Trusted"], stats: ["128 threats blocked", "0 critical incidents", "100% funds protected"], line: "Risk approved. Slippage and exposure remain inside policy." },
+  { id: "scout", name: "KAI", role: "SCOUT", level: 18, accent: "#40d7ff", short: "Explore · Discover · Alert", traits: ["Fast", "Wide", "Curious"], stats: ["1,248 contracts scanned", "37 opportunities found", "94% signal accuracy"], line: AGENT_LINES.scout, portrait: "/agents/kai.png", auraRate: 11, mouthLine: 0.4 },
+  { id: "analyst", name: "LYRA", role: "ANALYST", level: 24, accent: "#a78bfa", short: "Decode · Research · Score", traits: ["Deep", "Precise", "Rigorous"], stats: ["412 protocols analyzed", "128 risk reports", "96% analysis success"], line: AGENT_LINES.analyst, portrait: "/agents/lyra.png", auraRate: 9, mouthLine: 0.41 },
+  { id: "commander", name: "ORION", role: "COMMANDER", level: 32, accent: "#f3ba2f", short: "Orchestrate · Adapt · Evolve", traits: ["Strategic", "Vision", "Leadership"], stats: ["184 missions created", "$47,320 total earned", "92% mission success"], line: AGENT_LINES.commander, portrait: "/agents/orion.png", auraRate: 14, mouthLine: 0.43 },
+  { id: "strategist", name: "NOVA", role: "STRATEGIST", level: 21, accent: "#8f7cff", short: "Plan · Simulate · Optimize", traits: ["Smart", "Adaptive", "Efficient"], stats: ["1,024 simulations", "317 optimized routes", "68% higher average ROI"], line: AGENT_LINES.strategist, portrait: "/agents/nova.png", auraRate: 10, mouthLine: 0.4 },
+  { id: "executor", name: "REX", role: "EXECUTOR", level: 27, accent: "#ff5151", short: "Trade · Deploy · Settle", traits: ["Atomic", "Reliable", "Profitable"], stats: ["846 transactions", "$124,882 profit generated", "99.1% execution success"], line: AGENT_LINES.executor, portrait: "/agents/rex.png", auraRate: 13, mouthLine: 0.42 },
+  { id: "guardian", name: "AEGIS", role: "GUARDIAN", level: 19, accent: "#50e3a4", short: "Protect · Monitor · Balance", traits: ["Secure", "Alert", "Trusted"], stats: ["128 threats blocked", "0 critical incidents", "100% funds protected"], line: AGENT_LINES.guardian, portrait: "/agents/aegis.png", auraRate: 8, mouthLine: 0.41 },
 ];
-
-function speak(text: string) {
-  if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
-  window.speechSynthesis.cancel();
-  const utterance = new SpeechSynthesisUtterance(text);
-  utterance.rate = 0.95;
-  utterance.pitch = 0.92;
-  window.speechSynthesis.speak(utterance);
-}
 
 export function CharacterRoster() {
   const [selectedId, setSelectedId] = useState("scout");
   const [missionState, setMissionState] = useState<"idle" | "deploying" | "active">("idle");
+  const [speech, setSpeech] = useState<SpeechCue | null>(null);
+  const [voiceMeta, setVoiceMeta] = useState<VoicePlayMeta | null>(null);
+  const [voiceBusy, setVoiceBusy] = useState(false);
+  const [farmTick, setFarmTick] = useState(0);
   const selected = useMemo(() => AGENTS.find((agent) => agent.id === selectedId) ?? AGENTS[0], [selectedId]);
+
+  useEffect(() => {
+    const id = window.setInterval(() => setFarmTick((value) => value + 1), 90);
+    return () => {
+      window.clearInterval(id);
+      stopAgentSpeech();
+    };
+  }, []);
+
+  const speakLine = async (agentId: string, text: string) => {
+    const id = Date.now();
+    setVoiceBusy(true);
+    setSpeech({ id, agentId, text });
+    try {
+      await playAgentSpeech(agentId, text, (meta) => {
+        setVoiceMeta(meta);
+        setSpeech((current) => (current?.id === id ? { ...current, durationMs: meta.durationMs } : current));
+      });
+    } finally {
+      setVoiceBusy(false);
+    }
+  };
 
   const deploy = () => {
     if (missionState !== "idle") return;
     setMissionState("deploying");
-    speak("Deploying mission. Agent team assembling.");
+    speakLine("commander", DEPLOY_LINE);
     window.setTimeout(() => setMissionState("active"), 1300);
   };
 
@@ -52,7 +75,7 @@ export function CharacterRoster() {
           <span>BINANCEFF // AGENT ECONOMY</span>
           <h2>CHOOSE YOUR OPERATING TEAM</h2>
         </div>
-        <div className="agent-live-pill"><i /> LIVE RUNTIME</div>
+        <div className="agent-live-pill"><i /> {voiceMeta ? `${voiceMeta.label} · ${voiceMeta.voice}` : "NEURAL VOICE READY"}</div>
       </div>
 
       <div className="agent-roster-grid">
@@ -66,11 +89,20 @@ export function CharacterRoster() {
               style={{ ["--agent-accent" as string]: agent.accent }}
               onClick={() => setSelectedId(agent.id)}
             >
-              <div className={`agent-avatar agent-avatar-${agent.id}`} aria-hidden="true">
-                <div className="agent-avatar-ring" />
-                <div className="agent-avatar-head" />
-                <div className="agent-avatar-body" />
-                <div className="agent-avatar-core" />
+              <div className={`agent-portrait${speech?.agentId === agent.id ? " is-speaking" : ""}`}>
+                <SpeakingPortrait
+                  src={agent.portrait}
+                  alt={`${agent.name} ${agent.role}`}
+                  mouthLine={agent.mouthLine}
+                  rate={voiceProfile(agent.id).rate}
+                  speech={speech}
+                  speaking={speech?.agentId === agent.id}
+                />
+                <AgentAura accent={agent.accent} selected={active} />
+                <div className="agent-aura-chip">
+                  <b>AURA FARMING</b>
+                  <span>+{(agent.level * 184 + farmTick * agent.auraRate).toLocaleString()}</span>
+                </div>
               </div>
               <div className="agent-card-copy">
                 <div className="agent-role">{agent.role}</div>
@@ -85,7 +117,17 @@ export function CharacterRoster() {
       </div>
 
       <div className="agent-detail-panel" style={{ ["--agent-accent" as string]: selected.accent }}>
-        {selected.id === "scout" ? <KaiAvatarPreview /> : null}
+        <div className={`agent-detail-face${speech?.agentId === selected.id ? " is-speaking" : ""}`}>
+          <SpeakingPortrait
+            src={selected.portrait}
+            alt={`${selected.name} ${selected.role}`}
+            mouthLine={selected.mouthLine}
+            rate={voiceProfile(selected.id).rate}
+            speech={speech}
+            speaking={speech?.agentId === selected.id}
+          />
+          <AgentAura accent={selected.accent} selected />
+        </div>
         <div className="agent-detail-main">
           <span className="agent-detail-kicker">ACTIVE CHARACTER</span>
           <h3>{selected.name} <small>{selected.role}</small></h3>
@@ -93,7 +135,9 @@ export function CharacterRoster() {
           <div className="agent-stats">{selected.stats.map((stat) => <span key={stat}>{stat}</span>)}</div>
         </div>
         <div className="agent-actions">
-          <button type="button" onClick={() => speak(selected.line)}>HEAR AGENT</button>
+          <button type="button" disabled={voiceBusy} onClick={() => speakLine(selected.id, selected.line)}>
+            {voiceBusy && speech?.agentId === selected.id ? "SYNTHESIZING…" : "HEAR AGENT"}
+          </button>
           <button type="button" className="agent-action-primary" onClick={deploy}>
             {missionState === "idle" ? "DEPLOY MISSION" : missionState === "deploying" ? "ASSEMBLING TEAM…" : "MISSION ACTIVE"}
           </button>
