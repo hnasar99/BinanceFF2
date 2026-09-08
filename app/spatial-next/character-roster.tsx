@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { KaiAvatarPreview } from "./kai-avatar-preview";
 
 type Agent = {
   id: string;
@@ -33,9 +34,9 @@ function speak(text: string) {
 }
 
 export function CharacterRoster() {
-  const [selectedId, setSelectedId] = useState("commander");
+  const [selectedId, setSelectedId] = useState("scout");
   const [missionState, setMissionState] = useState<"idle" | "deploying" | "active">("idle");
-  const selected = useMemo(() => AGENTS.find((agent) => agent.id === selectedId) ?? AGENTS[2], [selectedId]);
+  const selected = useMemo(() => AGENTS.find((agent) => agent.id === selectedId) ?? AGENTS[0], [selectedId]);
 
   const deploy = () => {
     if (missionState !== "idle") return;
@@ -84,6 +85,7 @@ export function CharacterRoster() {
       </div>
 
       <div className="agent-detail-panel" style={{ ["--agent-accent" as string]: selected.accent }}>
+        {selected.id === "scout" ? <KaiAvatarPreview /> : null}
         <div className="agent-detail-main">
           <span className="agent-detail-kicker">ACTIVE CHARACTER</span>
           <h3>{selected.name} <small>{selected.role}</small></h3>
