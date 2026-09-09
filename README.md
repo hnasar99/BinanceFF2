@@ -9,6 +9,8 @@
 - Conexión de browser wallet y cambio automático a BSC Testnet (chain 97).
 - Registro oficial de despliegues de `@bnbagent/sdk` para identidad ERC-8004 y commerce ERC-8183.
 - Descomposición de intención, selección de squad, presupuesto/caducidad/acciones y creación de evidencia.
+- Opportunity Radar: quotes con TTL, simulación neta y risk gate sobre reservas reales de PancakeSwap, ApeSwap y THENA. Sin execute automático.
+- Wallet testnet: saldo, send, receive, swap Pancake y settlement memo firmados por la wallet.
 - Contratos Solidity `EconomicMandate` y `BountyEscrow` en `contracts/`.
 
 La app nunca almacena una private key del navegador. El settlement productivo debe utilizar wallets con alcance limitado y el ciclo ERC-8183 del SDK oficial.

@@ -28,9 +28,9 @@ export function GamifiedEntry({ compact = false }: { compact?: boolean }) {
   return (
     <a
       className={`spatial-entry is-ready${compact ? " spatial-entry-inline" : ""}`}
-      href="/spatial"
-      title="Enter the gamified spatial layer"
-      aria-label="Enter gamified WebGL interface"
+      href="/spatial-next"
+      title="Enter the live ops command center"
+      aria-label="Enter gamified live operations interface"
     >
       {compact ? "ENTER GAMIFIED EXPERIENCE" : "GAMIFIED"}
     </a>

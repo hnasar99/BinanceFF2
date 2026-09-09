@@ -24,7 +24,7 @@ Compositor visual donde el usuario arma un squad. Muestra cobertura de capacidad
 
 ### Live Mission Room
 
-La ejecución se representa como un mapa/timeline de misión: objetivos, agentes desplegados, pasos activos, llamadas de herramientas, evidencia, checkpoints y decisiones humanas. Los estados críticos priorizan precisión sobre efectos visuales.
+La ejecución se representa como un mapa/timeline de misión: objetivos, agentes desplegados, pasos activos, llamadas de herramientas, evidencia, checkpoints y decisiones humanas. Los estados críticos priorizan precisión sobre efectos visuales. La vista gamificada (`/spatial-next`) es una cabina de comandante con un escenario de squad: foto de cada agente con el doble 3D encima y headset de comms. El jugador elige vista List, Cards o Single. Abajo, un scroller de bounties y los squads que los ejecutan. Las voces no se superponen.
 
 ### Agent Tutor
 
@@ -60,6 +60,7 @@ Rankings por temporada y categoría, no una clasificación única. Métricas: tr
 ## Navegación primaria
 
 - Command Center
+- Radar
 - Agents
 - Bounties
 - Teams

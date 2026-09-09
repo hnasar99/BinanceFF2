@@ -16,6 +16,7 @@ import {
   Orbit,
   Play,
   Plus,
+  Radar,
   Radio,
   Search,
   ShieldCheck,
@@ -44,6 +45,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { MissionConsole, type ConsoleMission } from "./mission-console";
+import { OpportunityRadar } from "./opportunity-radar";
 
 type Agent = {
   id: number;
@@ -212,6 +214,7 @@ const missions = [
 const nav = [
   ["command", LayoutDashboard, "Command"],
   ["console", Terminal, "Console"],
+  ["radar", Radar, "Radar"],
   ["agents", Bot, "Agents"],
   ["bounties", Target, "Bounties"],
   ["teams", Users, "Teams"],
@@ -379,8 +382,8 @@ function Header({
         </button>
         <button className="wallet-pill">
           <span className="bnb-dot">◆</span>
-          <b>12.48 BNB</b>
-          <small>$7,861.22</small>
+          <b>CONNECT WALLET</b>
+          <small>BINANCE / METAMASK</small>
         </button>
       </div>
     </header>
@@ -427,13 +430,15 @@ function CommandCenter({
           </div>
           <div className="quick-intents">
             <span>QUICK START</span>
-            {["Scan liquidity", "Audit a contract", "Launch a bounty"].map(
-              (q) => (
-                <button key={q} onClick={() => setIntent(q)}>
-                  {q}
-                </button>
-              ),
-            )}
+            {[
+              ["Scan liquidity", () => navigate("radar")],
+              ["Audit a contract", () => setIntent("Audit a contract")],
+              ["Launch a bounty", () => navigate("bounties")],
+            ].map(([q, action]) => (
+              <button key={String(q)} onClick={action as () => void}>
+                {q}
+              </button>
+            ))}
             <GamifiedEntry compact />
           </div>
         </div>
@@ -1215,18 +1220,66 @@ function TutorView() {
 function WalletView() {
   const [authorized, setAuthorized] = useState(true);
   const [walletAction, setWalletAction] = useState("");
+  const [address, setAddress] = useState("");
+  const [balanceLabel, setBalanceLabel] = useState("—");
+  const [sendTo, setSendTo] = useState("");
+  const [sendAmount, setSendAmount] = useState("0.01");
+  const [swapAmount, setSwapAmount] = useState("0.002");
+  const [busy, setBusy] = useState("");
+  const [txHash, setTxHash] = useState("");
+  const refreshWallet = async (next = address) => {
+    if (!next) {
+      setBalanceLabel("Connect wallet");
+      return;
+    }
+    const { getNativeBalance, formatEther } = await import("@/lib/wallet-client");
+    setBalanceLabel(formatEther(await getNativeBalance(next)));
+  };
+  useEffect(() => {
+    void import("@/lib/wallet-client").then(async ({ connectedAccount, formatEther, getNativeBalance }) => {
+      const current = await connectedAccount();
+      setAddress(current);
+      if (current) setBalanceLabel(formatEther(await getNativeBalance(current)));
+    });
+  }, []);
+  const run = async (label: string, work: () => Promise<string>) => {
+    setBusy(label);
+    setWalletAction("");
+    setTxHash("");
+    try {
+      const hash = await work();
+      setTxHash(hash);
+      setWalletAction(`${label} confirmed`);
+      if (address) await refreshWallet(address);
+    } catch (reason) {
+      setWalletAction(reason instanceof Error ? reason.message : `${label} failed`);
+    } finally {
+      setBusy("");
+    }
+  };
   return (
     <div className="page">
       <div className="page-title">
         <div>
-          <span className="eyebrow">TREASURY // BNB SMART CHAIN</span>
+          <span className="eyebrow">TREASURY // BSC TESTNET</span>
           <h1>Capital with boundaries</h1>
           <p>
             Every agent payment maps to explicit authority, evidence and a
-            verifiable receipt.
+            verifiable receipt on chain 97.
           </p>
         </div>
-        <Button className="deploy-btn" onClick={() => setWalletAction("Testnet top-up queued · 2.00 tBNB")}>
+        <Button
+          className="deploy-btn"
+          disabled={busy !== ""}
+          onClick={async () => {
+            const { connectWallet, openTestnetFaucet } = await import("@/lib/wallet-client");
+            const session = await connectWallet();
+            setAddress(session.address);
+            await refreshWallet(session.address);
+            openTestnetFaucet();
+            setWalletAction("Official BSC testnet faucet opened. Refresh after the drip lands.");
+          }}
+        >
           <Plus /> ADD FUNDS
         </Button>
       </div>
@@ -1234,15 +1287,61 @@ function WalletView() {
         <article className="balance-card">
           <span>AVAILABLE BALANCE</span>
           <h2>
-            <i>◆</i> 12.48 <small>BNB</small>
+            <i>◆</i> {address ? balanceLabel : "—"} <small>tBNB</small>
           </h2>
-          <b>$7,861.22 USD</b>
+          <b>{address ? `${address.slice(0, 6)}…${address.slice(-4)} · chain 97` : "Wallet not connected"}</b>
           <div>
-            <button onClick={() => setWalletAction("Send stays locked until a mandate is approved.")}>SEND</button>
-            <button onClick={() => setWalletAction("Receive address copied for BSC Testnet.")}>RECEIVE</button>
-            <button onClick={() => setWalletAction("Swap preview: 0.40 BNB → 248 USDT (simulate only).")}>SWAP</button>
+            <button
+              disabled={busy !== ""}
+              onClick={() => void run("Send", async () => {
+                const { sendNative } = await import("@/lib/wallet-client");
+                return sendNative(sendTo, sendAmount);
+              })}
+            >
+              SEND
+            </button>
+            <button
+              disabled={busy !== "" || !address}
+              onClick={async () => {
+                await navigator.clipboard.writeText(address);
+                setWalletAction(`Receive address copied · ${address}`);
+              }}
+            >
+              RECEIVE
+            </button>
+            <button
+              disabled={busy !== ""}
+              onClick={() => void run("Swap", async () => {
+                const { swapTBnbForUsdt } = await import("@/lib/wallet-client");
+                const result = await swapTBnbForUsdt(swapAmount);
+                return result.hash;
+              })}
+            >
+              SWAP
+            </button>
           </div>
-          {walletAction && <small>{walletAction}</small>}
+          <div className="wallet-form">
+            <label>
+              SEND TO
+              <input value={sendTo} onChange={(event) => setSendTo(event.target.value)} placeholder="0x…" />
+            </label>
+            <div className="row">
+              <label>
+                SEND tBNB
+                <input value={sendAmount} onChange={(event) => setSendAmount(event.target.value)} />
+              </label>
+              <label>
+                SWAP tBNB
+                <input value={swapAmount} onChange={(event) => setSwapAmount(event.target.value)} />
+              </label>
+            </div>
+          </div>
+          {walletAction && <small>{busy ? `${busy}…` : walletAction}</small>}
+          {txHash && (
+            <a className="wallet-link" href={`https://testnet.bscscan.com/tx/${txHash}`} target="_blank" rel="noreferrer">
+              {txHash.slice(0, 10)}…{txHash.slice(-6)}
+            </a>
+          )}
         </article>
         <article>
           <span>IN ESCROW</span>
@@ -1366,6 +1465,7 @@ export default function Home() {
             onBack={() => setActive("command")}
           />
         )}
+        {active === "radar" && <OpportunityRadar />}
         {active === "agents" && <AgentsView navigate={setActive} />}
         {active === "bounties" && <BountiesView openConsole={openConsole} />}
         {active === "teams" && <TeamsView openConsole={openConsole} />}

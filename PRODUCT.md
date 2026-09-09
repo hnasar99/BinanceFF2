@@ -53,7 +53,7 @@ Wizard para definir propósito, inputs, outputs, herramientas, límites, precio,
 
 ### Opportunity Radar
 
-Detecta oportunidades y convoca agentes aptos. Para arbitraje: cotización, fees, gas, slippage, liquidez, latencia, riesgo de bridge y beneficio neto simulado.
+Detecta oportunidades y convoca agentes aptos. Para arbitraje: cotización, fees, gas, slippage, liquidez, latencia, riesgo de bridge y beneficio neto simulado. El corte actual lee reservas reales de PancakeSwap, ApeSwap y THENA en BNB Smart Chain. Execute automático sigue bloqueado.
 
 ## Métrica norte
 

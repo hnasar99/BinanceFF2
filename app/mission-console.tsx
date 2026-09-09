@@ -57,7 +57,10 @@ export function MissionConsole({
     [progress, setProgress] = useState(start),
     [running, setRunning] = useState(true),
     [tick, setTick] = useState(2),
-    [settled, setSettled] = useState(false);
+    [settled, setSettled] = useState(false),
+    [settling, setSettling] = useState(false),
+    [settleError, setSettleError] = useState(""),
+    [settleTx, setSettleTx] = useState("");
   useEffect(() => {
     if (!running || progress >= 96) return;
     const timer = setInterval(() => {
@@ -204,13 +207,19 @@ export function MissionConsole({
           <h3>{settled ? "Escrow released" : progress < 90 ? "Evidence verdict" : "Settlement approval"}</h3>
           <p>
             {settled
-              ? `${mission.reward} left escrow after your approval. The squad receipt is sealed on BNB testnet.`
+              ? `${mission.reward} left after your signed testnet receipt ${settleTx.slice(0, 10)}…${settleTx.slice(-6)}.`
               : progress < 90
                 ? "Oracle validates every source and seals a reproducible result before funds can move."
-                : "All work is complete. Your approval will release the escrowed reward."}
+                : "All work is complete. Your wallet will sign a 0-value settlement memo on BSC Testnet."}
           </p>
+          {settleError && <small className="wallet-link">{settleError}</small>}
+          {settleTx && (
+            <a className="wallet-link" href={`https://testnet.bscscan.com/tx/${settleTx}`} target="_blank" rel="noreferrer">
+              View receipt on BscScan
+            </a>
+          )}
           <button
-            disabled={settled}
+            disabled={settled || settling}
             onClick={() => {
               if (progress < 90) {
                 setProgress(90);
@@ -218,17 +227,31 @@ export function MissionConsole({
                 setRunning(false);
                 return;
               }
-              setProgress(100);
-              setRunning(false);
-              setSettled(true);
+              setSettling(true);
+              setSettleError("");
+              void import("@/lib/wallet-client").then(async ({ settleOnChain }) => {
+                try {
+                  const hash = await settleOnChain(mission.id);
+                  setSettleTx(hash);
+                  setProgress(100);
+                  setRunning(false);
+                  setSettled(true);
+                } catch (reason) {
+                  setSettleError(reason instanceof Error ? reason.message : "Settlement rejected");
+                } finally {
+                  setSettling(false);
+                }
+              });
             }}
           >
             <Zap />
             {settled
-              ? "SETTLED · RECEIPT SEALED"
-              : progress < 90
-                ? "ADVANCE TO VERDICT"
-                : "REVIEW & SETTLE"}
+              ? "SETTLED · RECEIPT ON-CHAIN"
+              : settling
+                ? "WAITING FOR WALLET…"
+                : progress < 90
+                  ? "ADVANCE TO VERDICT"
+                  : "REVIEW & SETTLE"}
           </button>
         </aside>
       </section>

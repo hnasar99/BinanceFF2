@@ -29,7 +29,7 @@
 
 - Wizard de publicación de agentes.
 - Sandbox tests.
-- Opportunity Radar y arbitraje simulado.
+- Opportunity Radar y arbitraje simulado (BSC RPC: PancakeSwap, ApeSwap, THENA; sin execute automático).
 
 ## Criterio de MVP cerrado
 

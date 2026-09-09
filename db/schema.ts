@@ -49,3 +49,38 @@ export const evidence = sqliteTable("evidence", {
   id:integer("id").primaryKey({autoIncrement:true}), ownerId:text("owner_id").notNull().references(()=>users.id), missionId:integer("mission_id").notNull().references(()=>missions.id),
   kind:text("kind").notNull(), uri:text("uri").notNull(), digest:text("digest").notNull(), status:text("status").notNull().default("PENDING"), createdAt:integer("created_at",{mode:"timestamp"}).notNull().$defaultFn(()=>new Date()),
 });
+
+export const opportunities = sqliteTable("opportunities", {
+  id:integer("id").primaryKey({autoIncrement:true}), ownerId:text("owner_id").notNull().references(()=>users.id),
+  publicCode:text("public_code").notNull(), chain:text("chain").notNull().default("bnb-smart-chain"), pair:text("pair").notNull(),
+  buyVenue:text("buy_venue").notNull(), sellVenue:text("sell_venue").notNull(), status:text("status").notNull().default("OPEN"),
+  source:text("source").notNull().default("MOCK"), expiresAt:integer("expires_at",{mode:"timestamp"}).notNull(),
+  createdAt:integer("created_at",{mode:"timestamp"}).notNull().$defaultFn(()=>new Date()),
+}, table => [uniqueIndex("idx_opportunities_public_code").on(table.publicCode)]);
+
+export const quotes = sqliteTable("quotes", {
+  id:integer("id").primaryKey({autoIncrement:true}), ownerId:text("owner_id").notNull().references(()=>users.id),
+  opportunityId:integer("opportunity_id").notNull().references(()=>opportunities.id), chain:text("chain").notNull().default("bnb-smart-chain"),
+  venue:text("venue").notNull(), pair:text("pair").notNull(), side:text("side").notNull(), priceUsdMicros:integer("price_usd_micros").notNull(),
+  feeBps:integer("fee_bps").notNull(), gasUsdMicros:integer("gas_usd_micros").notNull(), liquidityUsdMicros:integer("liquidity_usd_micros").notNull(),
+  source:text("source").notNull().default("MOCK"), status:text("status").notNull().default("LIVE"),
+  expiresAt:integer("expires_at",{mode:"timestamp"}).notNull(), createdAt:integer("created_at",{mode:"timestamp"}).notNull().$defaultFn(()=>new Date()),
+});
+
+export const simulations = sqliteTable("simulations", {
+  id:integer("id").primaryKey({autoIncrement:true}), ownerId:text("owner_id").notNull().references(()=>users.id),
+  opportunityId:integer("opportunity_id").notNull().references(()=>opportunities.id), chain:text("chain").notNull().default("bnb-smart-chain"),
+  notionalUsdMicros:integer("notional_usd_micros").notNull(), grossUsdMicros:integer("gross_usd_micros").notNull(),
+  feesUsdMicros:integer("fees_usd_micros").notNull(), gasUsdMicros:integer("gas_usd_micros").notNull(),
+  slippageUsdMicros:integer("slippage_usd_micros").notNull(), netUsdMicros:integer("net_usd_micros").notNull(),
+  netBps:integer("net_bps").notNull(), adverseJson:text("adverse_json").notNull().default("[]"),
+  createdAt:integer("created_at",{mode:"timestamp"}).notNull().$defaultFn(()=>new Date()),
+});
+
+export const riskAssessments = sqliteTable("risk_assessments", {
+  id:integer("id").primaryKey({autoIncrement:true}), ownerId:text("owner_id").notNull().references(()=>users.id),
+  opportunityId:integer("opportunity_id").notNull().references(()=>opportunities.id),
+  simulationId:integer("simulation_id").notNull().references(()=>simulations.id), chain:text("chain").notNull().default("bnb-smart-chain"),
+  decision:text("decision").notNull(), reasonsJson:text("reasons_json").notNull().default("[]"),
+  createdAt:integer("created_at",{mode:"timestamp"}).notNull().$defaultFn(()=>new Date()),
+});
