@@ -11,7 +11,9 @@ export function generateSecMsGec(nowUnix?: number): Promise<string>;
 export function synthesizeSpeech(input: {
   agentId: string;
   text: string;
+  locale?: string;
   secrets?: Record<string, string>;
+  betterThan?: string;
   fetchImpl?: typeof fetch;
   edgeSynth?: (profile: Record<string, unknown>, text: string) => Promise<{
     audio: Uint8Array;

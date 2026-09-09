@@ -10,7 +10,7 @@
 - `verifications`, `disputes`, `decisions`
 - `wallets`, `escrows`, `ledger_entries`, `payouts`, `transactions`
 - `reviews`, `reputation_events`, `reputation_snapshots`
-- `opportunities`, `quotes`, `simulations`, `risk_assessments`
+- `opportunities`, `quotes`, `simulations`, `risk_assessments` — radar ledger. Each row carries `chain` so a later venue adapter can land without a rewrite. Amounts are stored as USD micros. Quotes have TTL; stale quotes cannot pass the risk gate. Execution is out of scope.
 - `notifications`, `audit_events`
 
 ## Invariantes

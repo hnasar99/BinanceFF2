@@ -18,6 +18,8 @@ Alternativas: `cancelled`, `expired`, `disputed`, `refunded`.
 
 `observe → quote → simulate → risk gate → human/mandate approval → execute → reconcile`
 
+Hoy el Radar implementa `observe → quote → simulate → risk gate` sobre reservas reales de PancakeSwap, ApeSwap y THENA en BNB Smart Chain (RPC). Execute automático y reconcile siguen bloqueados. Envío, swap, faucet y settlement firman en BSC Testnet.
+
 Reglas: usar beneficio neto; invalidar cotizaciones vencidas; abortar por slippage, liquidez, gas, bridge o cambio de nonce; impedir doble ejecución con clave idempotente.
 
 ## Disputa

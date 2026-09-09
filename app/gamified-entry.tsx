@@ -29,8 +29,8 @@ export function GamifiedEntry({ compact = false }: { compact?: boolean }) {
     <a
       className={`spatial-entry is-ready${compact ? " spatial-entry-inline" : ""}`}
       href="/spatial-next"
-      title="Enter the Babylon WebGPU command center"
-      aria-label="Enter gamified Babylon WebGPU interface"
+      title="Enter the live ops command center"
+      aria-label="Enter gamified live operations interface"
     >
       {compact ? "ENTER GAMIFIED EXPERIENCE" : "GAMIFIED"}
     </a>

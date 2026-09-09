@@ -1,0 +1,13 @@
+export const BSC_MAINNET_RPCS: string[];
+export const BSC_TESTNET_RPCS: string[];
+export function addrWord(address: string): string;
+export function uintWord(value: bigint | number | string): string;
+export function decodeAddress(result: string): string;
+export function decodeUint(result: string, index?: number): bigint;
+export function toDecimal(wei: bigint | number | string, decimals?: number, digits?: number): number;
+export function utf8Hex(value: string): string;
+export function parseEther(value: string): bigint;
+export function formatEther(wei: bigint | number | string, digits?: number): string;
+export function rpc(method: string, params?: unknown[], urls?: string[]): Promise<string>;
+export function rpcBatch(calls: Array<{ method: string; params?: unknown[] }>, urls?: string[]): Promise<string[]>;
+export function ethCall(to: string, data: string): { method: "eth_call"; params: [{ to: string; data: string }, "latest"] };

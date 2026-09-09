@@ -975,17 +975,41 @@ function MissionRoom({ compact, phone, mission, running, setRunning }: { compact
   );
 }
 
-function Vault({ compact, phone, wallet, connect, technical, setTechnical }: { compact: boolean; phone: boolean; wallet: string; connect: () => void; technical: boolean; setTechnical: (value: boolean) => void }) {
+function Vault({ compact, phone, wallet, balance, lastTx, busy, connect, addFunds, send, receive, swap, settle, technical, setTechnical }: {
+  compact: boolean;
+  phone: boolean;
+  wallet: string;
+  balance: string;
+  lastTx: string;
+  busy: string;
+  connect: () => void;
+  addFunds: () => void;
+  send: () => void;
+  receive: () => void;
+  swap: () => void;
+  settle: () => void;
+  technical: boolean;
+  setTechnical: (value: boolean) => void;
+}) {
   const { t } = useSpatialI18n();
+  const shortWallet = wallet ? `${wallet.slice(0, 6)}…${wallet.slice(-4)}` : "";
   return (
     <Container width="100%" flexDirection="column" gap={14} flexShrink={0}>
-      <Title compact={compact} phone={phone} eyebrow={t("TREASURY VAULT · BNB SMART CHAIN")} title={t("Money moves only after proof.")} description={t("Balances, authority, budget, approvals, and settlement gates are visible in one secure room.")} />
+      <Title compact={compact} phone={phone} eyebrow={t("TREASURY VAULT · BSC TESTNET")} title={t("Money moves only after proof.")} description={t("Balances, authority, budget, approvals, and settlement gates are visible in one secure room.")} />
       <Container flexDirection={compact ? "column" : "row"} gap={12}>
         <Panel flexGrow={1} gap={13}>
           <Label>{t("CONNECTED WALLET")}</Label>
-          <Text fontSize={compact ? 24 : 34} lineHeight={compact ? "29px" : "39px"} fontWeight="bold" color="#ffffff">{wallet ? t(wallet) : t("Not connected")}</Text>
-          <Text fontSize={14} lineHeight="19px" color={MUTED}>{t(wallet ? "BNB Smart Chain Testnet · ready" : "Connect to inspect and approve settlements.")}</Text>
-          <Primary onClick={connect}>{t(wallet ? "WALLET CONNECTED" : "CONNECT WALLET")}</Primary>
+          <Text fontSize={compact ? 24 : 34} lineHeight={compact ? "29px" : "39px"} fontWeight="bold" color="#ffffff">{wallet ? shortWallet : t("Not connected")}</Text>
+          <Text fontSize={14} lineHeight="19px" color={MUTED}>{wallet ? `${balance || "—"} tBNB · chain 97` : t("Connect to inspect and approve settlements.")}</Text>
+          <Primary onClick={connect} disabled={Boolean(busy)}>{t(wallet ? "WALLET CONNECTED" : "CONNECT WALLET")}</Primary>
+          <Container flexDirection="row" gap={8} flexWrap="wrap">
+            <Ghost onClick={addFunds}>{t("ADD FUNDS")}</Ghost>
+            <Ghost onClick={send}>{t("SEND")}</Ghost>
+            <Ghost onClick={receive}>{t("RECEIVE")}</Ghost>
+            <Ghost onClick={swap}>{t("SWAP")}</Ghost>
+            <Ghost onClick={settle}>{t("SETTLE")}</Ghost>
+          </Container>
+          {lastTx ? <Text fontSize={12} lineHeight="16px" color={CYAN}>{lastTx}</Text> : null}
         </Panel>
         <Panel flexGrow={1} gap={11}>
           <Label color={GREEN}>{t("ACTIVE MANDATE · SAFE")}</Label>
@@ -1080,6 +1104,9 @@ function Hud() {
   const [pending, setPending] = useState(false);
   const [running, setRunning] = useState(true);
   const [wallet, setWallet] = useState("");
+  const [walletBalance, setWalletBalance] = useState("");
+  const [walletBusy, setWalletBusy] = useState("");
+  const [walletTx, setWalletTx] = useState("");
   const [technical, setTechnical] = useState(false);
   const [missions, setMissions] = useState(seedMissions);
   const [bounties, setBounties] = useState(seedBounties);
@@ -1184,32 +1211,33 @@ function Hud() {
     setLastAction(`${mission.id} · ${t("LIVE CONSOLE ONLINE")}`);
   }, [audio, intent, t]);
 
-  const connect = async () => {
-    const ethereum = (window as typeof window & { ethereum?: { request: (args: { method: string; params?: unknown[] }) => Promise<unknown> } }).ethereum;
-    if (!ethereum) {
-      setWallet("Install a compatible wallet");
-      return;
-    }
+  const refreshVault = async (address: string) => {
+    const { formatEther, getNativeBalance } = await import("@/lib/wallet-client");
+    setWalletBalance(formatEther(await getNativeBalance(address)));
+  };
+  const runVault = async (label: string, work: () => Promise<string>) => {
+    setWalletBusy(label);
     try {
-      await ethereum.request({ method: "wallet_switchEthereumChain", params: [{ chainId: "0x61" }] });
-    } catch {
-      try {
-        await ethereum.request({
-          method: "wallet_addEthereumChain",
-          params: [{
-            chainId: "0x61",
-            chainName: "BNB Smart Chain Testnet",
-            nativeCurrency: { name: "tBNB", symbol: "tBNB", decimals: 18 },
-            rpcUrls: ["https://data-seed-prebsc-1-s1.bnbchain.org:8545"],
-            blockExplorerUrls: ["https://testnet.bscscan.com"],
-          }],
-        });
-      } catch {
-        return;
-      }
+      const hash = await work();
+      setWalletTx(hash);
+      setLastAction(`${label} · ${hash.slice(0, 10)}…`);
+      if (wallet) await refreshVault(wallet);
+    } catch (reason) {
+      setLastAction(reason instanceof Error ? reason.message : `${label} failed`);
+    } finally {
+      setWalletBusy("");
     }
-    const accounts = await ethereum.request({ method: "eth_requestAccounts" }) as string[];
-    if (accounts?.[0]) setWallet(`${accounts[0].slice(0, 6)}…${accounts[0].slice(-4)}`);
+  };
+  const connect = async () => {
+    try {
+      const { connectWallet } = await import("@/lib/wallet-client");
+      const session = await connectWallet();
+      setWallet(session.address);
+      await refreshVault(session.address);
+      setLastAction(`${session.address.slice(0, 6)}…${session.address.slice(-4)} · BSC TESTNET`);
+    } catch (reason) {
+      setLastAction(reason instanceof Error ? reason.message : t("Install a compatible wallet"));
+    }
   };
 
   const openMission = useCallback((mission: Mission) => {
@@ -1418,7 +1446,48 @@ function Hud() {
                 <MissionRoom compact={compact} phone={phone} mission={activeMission} running={running} setRunning={setRunning} />
               </DeckView>
               <DeckView active={view === "vault"}>
-                <Vault compact={compact} phone={phone} wallet={wallet} connect={connect} technical={technical} setTechnical={setTechnical} />
+                <Vault
+                  compact={compact}
+                  phone={phone}
+                  wallet={wallet}
+                  balance={walletBalance}
+                  lastTx={walletTx}
+                  busy={walletBusy}
+                  connect={connect}
+                  addFunds={async () => {
+                    const { connectWallet, openTestnetFaucet } = await import("@/lib/wallet-client");
+                    const session = await connectWallet();
+                    setWallet(session.address);
+                    await refreshVault(session.address);
+                    openTestnetFaucet();
+                    setLastAction(t("Official BSC testnet faucet opened"));
+                  }}
+                  send={() => void runVault("SEND", async () => {
+                    const to = window.prompt(t("Send tBNB to address"), "") || "";
+                    const amount = window.prompt(t("Amount in tBNB"), "0.01") || "0.01";
+                    const { sendNative } = await import("@/lib/wallet-client");
+                    return sendNative(to, amount);
+                  })}
+                  receive={async () => {
+                    if (!wallet) {
+                      await connect();
+                      return;
+                    }
+                    await navigator.clipboard.writeText(wallet);
+                    setLastAction(`${t("Receive address copied")} · ${wallet}`);
+                  }}
+                  swap={() => void runVault("SWAP", async () => {
+                    const amount = window.prompt(t("Swap tBNB for testnet USDT"), "0.002") || "0.002";
+                    const { swapTBnbForUsdt } = await import("@/lib/wallet-client");
+                    return (await swapTBnbForUsdt(amount)).hash;
+                  })}
+                  settle={() => void runVault("SETTLE", async () => {
+                    const { settleOnChain } = await import("@/lib/wallet-client");
+                    return settleOnChain(activeMission.id);
+                  })}
+                  technical={technical}
+                  setTechnical={setTechnical}
+                />
               </DeckView>
               <DeckView active={view === "academy"}>
                 <Academy compact={compact} phone={phone} />

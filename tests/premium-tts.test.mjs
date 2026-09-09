@@ -54,6 +54,29 @@ test("GEC payload is a stable 5-minute Windows-filetime window", () => {
   assert.match(first, /^[0-9]+6A5AA1D4EAFF4E9FB37E23D68491D6F4$/);
 });
 
+test("upgrade path skips weaker engines than the take already on disk", async () => {
+  const calls = [];
+  const audio = new Uint8Array(320).fill(3);
+  await assert.rejects(
+    () => synthesizeSpeech({
+      agentId: "scout",
+      text: "Commander, liquidity is moving.",
+      secrets: {},
+      betterThan: "edge",
+      edgeSynth: async () => {
+        calls.push("edge");
+        return { audio, mime: "audio/mpeg", engine: "edge", voice: "en-US-JennyNeural", cast: "Jessica" };
+      },
+      fetchImpl: async (url) => {
+        calls.push(String(url));
+        return new Response("no", { status: 500 });
+      },
+    }),
+    /no_upgrade/,
+  );
+  assert.deepEqual(calls, []);
+});
+
 test("synthesizeSpeech uses the first engine that returns audio", async () => {
   const audio = new Uint8Array(320).fill(7);
   const result = await synthesizeSpeech({

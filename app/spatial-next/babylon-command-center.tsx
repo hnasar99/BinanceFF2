@@ -71,9 +71,41 @@ function makeLink(B: any, scene: any, from: any, to: any, color: any, name: stri
   return line;
 }
 
+async function createEngine(B: any, canvas: HTMLCanvasElement) {
+  const webgpuReady = B.WebGPUEngine?.IsSupportedAsync
+    ? await B.WebGPUEngine.IsSupportedAsync
+    : Boolean(navigator.gpu && B.WebGPUEngine);
+
+  if (webgpuReady) {
+    try {
+      const webgpu = new B.WebGPUEngine(canvas, { antialias: true, adaptToDeviceRatio: true });
+      await webgpu.initAsync();
+      return { engine: webgpu, label: "Babylon.js · WebGPU", detail: "Native GPU path" };
+    } catch (reason) {
+      const detail = reason instanceof Error ? reason.message : "WebGPU init failed";
+      console.warn("WebGPU init failed, falling back to WebGL2", reason);
+      return {
+        engine: new B.Engine(canvas, true, { preserveDrawingBuffer: true, stencil: true }),
+        label: "Babylon.js · WebGL2 fallback",
+        detail,
+      };
+    }
+  }
+
+  const detail = navigator.gpu
+    ? "WebGPU exists but no adapter was returned."
+    : "Firefox/Linux often has no navigator.gpu. Enable dom.webgpu.enabled or test in Chrome 113+.";
+  return {
+    engine: new B.Engine(canvas, true, { preserveDrawingBuffer: true, stencil: true }),
+    label: "Babylon.js · WebGL2 fallback",
+    detail,
+  };
+}
+
 export function BabylonCommandCenter() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [renderer, setRenderer] = useState("Initializing GPU runtime…");
+  const [rendererDetail, setRendererDetail] = useState("");
   const [selected, setSelected] = useState("MASTER AGENT");
   const [status, setStatus] = useState("Booting command center");
 
@@ -91,20 +123,10 @@ export function BabylonCommandCenter() {
         const B = await loadBabylon();
         if (!B || disposed) return;
 
-        const canWebGPU = Boolean(navigator.gpu && B.WebGPUEngine);
-        if (canWebGPU) {
-          try {
-            engine = new B.WebGPUEngine(canvas, { antialias: true, adaptToDeviceRatio: true });
-            await engine.initAsync();
-            setRenderer("Babylon.js · WebGPU");
-          } catch {
-            engine = new B.Engine(canvas, true, { preserveDrawingBuffer: true, stencil: true });
-            setRenderer("Babylon.js · WebGL fallback");
-          }
-        } else {
-          engine = new B.Engine(canvas, true, { preserveDrawingBuffer: true, stencil: true });
-          setRenderer("Babylon.js · WebGL fallback");
-        }
+        const runtime = await createEngine(B, canvas);
+        engine = runtime.engine;
+        setRenderer(runtime.label);
+        setRendererDetail(runtime.detail);
 
         scene = new B.Scene(engine);
         scene.clearColor = new B.Color4(0.005, 0.008, 0.02, 1);
@@ -194,6 +216,7 @@ export function BabylonCommandCenter() {
           node.sphere.actionManager.registerAction(new B.ExecuteCodeAction(B.ActionManager.OnPickTrigger, () => {
             setSelected(names[index]);
             setStatus(index === 0 ? "Mission orchestration online" : `${names[index]} telemetry selected`);
+            window.dispatchEvent(new CustomEvent("binanceff-ops-focus", { detail: { node: names[index] } }));
             const target = node.root.position.clone();
             B.Animation.CreateAndStartAnimation("camera-target", camera, "target", 60, 30, camera.target.clone(), target, B.Animation.ANIMATIONLOOPMODE_CONSTANT);
           }));
@@ -240,34 +263,11 @@ export function BabylonCommandCenter() {
         style={{ width: "100vw", height: "100vh", display: "block", outline: "none", touchAction: "none", cursor: "grab" }}
       />
 
-      <div style={{ position: "absolute", inset: 0, pointerEvents: "none", background: "radial-gradient(circle at 50% 40%, transparent 0 30%, rgba(1,4,14,.24) 62%, rgba(1,2,8,.88) 100%)" }} />
-
-      <header style={{ position: "absolute", top: 24, left: 28, right: 28, display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 20, pointerEvents: "none" }}>
-        <div>
-          <div style={{ fontSize: 12, letterSpacing: ".28em", opacity: 0.58 }}>BINANCEFF // NEXUS</div>
-          <h1 style={{ margin: "8px 0 0", fontSize: "clamp(24px, 3vw, 46px)", lineHeight: 1, letterSpacing: "-.04em" }}>AGENT COMMAND CENTER</h1>
-        </div>
-        <div style={{ textAlign: "right", fontSize: 12, lineHeight: 1.7, opacity: 0.75 }}>
-          <div>{renderer}</div>
-          <div style={{ color: "#56f0a5" }}>● {status}</div>
-        </div>
-      </header>
-
-      <aside style={{ position: "absolute", left: 28, bottom: 28, width: "min(360px, calc(100vw - 56px))", padding: 18, border: "1px solid rgba(109,205,255,.2)", background: "rgba(2,8,22,.72)", backdropFilter: "blur(18px)", boxShadow: "0 18px 80px rgba(0,0,0,.45)", pointerEvents: "auto" }}>
-        <div style={{ fontSize: 10, letterSpacing: ".24em", opacity: 0.55 }}>ACTIVE TARGET</div>
-        <div style={{ marginTop: 7, fontSize: 22, fontWeight: 700 }}>{selected}</div>
-        <div style={{ marginTop: 8, fontSize: 13, lineHeight: 1.5, opacity: 0.7 }}>{status}. Drag to orbit, wheel to zoom, click any glowing system node to focus it.</div>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8, marginTop: 16 }}>
-          {["7 AGENTS", "4 CHAINS", "12 EVENTS/S"].map((label) => (
-            <div key={label} style={{ padding: "10px 8px", border: "1px solid rgba(255,255,255,.09)", background: "rgba(255,255,255,.025)", fontSize: 10, textAlign: "center", letterSpacing: ".08em" }}>{label}</div>
-          ))}
-        </div>
-      </aside>
-
-      <nav style={{ position: "absolute", right: 28, bottom: 28, display: "flex", gap: 10, pointerEvents: "auto" }}>
-        <a href="/spatial" style={{ color: "white", textDecoration: "none", border: "1px solid rgba(255,255,255,.12)", background: "rgba(5,8,20,.7)", padding: "11px 14px", fontSize: 11, letterSpacing: ".12em" }}>LEGACY SPATIAL</a>
-        <a href="/" style={{ color: "#02030a", textDecoration: "none", background: "#f3ba2f", padding: "11px 14px", fontSize: 11, fontWeight: 800, letterSpacing: ".12em" }}>EXIT</a>
-      </nav>
+      <div
+        aria-hidden="true"
+        title={`${renderer} · ${selected} · ${status}${rendererDetail ? ` · ${rendererDetail}` : ""}`}
+        style={{ position: "absolute", inset: 0, pointerEvents: "none" }}
+      />
     </main>
   );
 }

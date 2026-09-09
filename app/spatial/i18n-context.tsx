@@ -1,12 +1,13 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
-import { translate, type Locale } from "./i18n";
+import { interpolate, translate, translateLine, type Locale } from "./i18n";
 
 type SpatialI18n = {
   locale: Locale;
   setLocale: (locale: Locale) => void;
-  t: (value: string) => string;
+  t: (value: string, vars?: Record<string, string | number>) => string;
+  line: (value: string) => string;
 };
 
 const SpatialI18nContext = createContext<SpatialI18n | null>(null);
@@ -20,13 +21,21 @@ function preferredLocale(): Locale {
 }
 
 export function SpatialI18nProvider({ children }: { children: ReactNode }) {
-  const [locale, setLocaleState] = useState<Locale>(preferredLocale);
+  const [locale, setLocaleState] = useState<Locale>("en");
   const setLocale = useCallback((next: Locale) => {
     setLocaleState(next);
     window.localStorage.setItem("binanceff2-locale", next);
   }, []);
-  const t = useCallback((value: string) => translate(locale, value), [locale]);
-  const value = useMemo(() => ({ locale, setLocale, t }), [locale, setLocale, t]);
+  const t = useCallback((value: string, vars?: Record<string, string | number>) => {
+    const text = translate(locale, value);
+    return vars ? interpolate(text, vars) : text;
+  }, [locale]);
+  const line = useCallback((value: string) => translateLine(locale, value), [locale]);
+  const value = useMemo(() => ({ locale, setLocale, t, line }), [line, locale, setLocale, t]);
+
+  useEffect(() => {
+    setLocaleState(preferredLocale());
+  }, []);
 
   useEffect(() => {
     document.documentElement.lang = locale === "pt" ? "pt-BR" : locale;
