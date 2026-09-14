@@ -689,6 +689,9 @@ export function AgentAvatar({
   const armsRef = useRef<ReturnType<typeof createBodyDriver> | null>(null);
   const stationRef = useRef<ReturnType<typeof createAgentStation> | null>(null);
   const headsetRef = useRef<ReturnType<typeof createHeadset> | null>(null);
+  const cameraRef = useRef<any>(null);
+  const cameraHomeRadiusRef = useRef(2.35);
+  const cameraTargetRadiusRef = useRef(2.35);
   const pendingRef = useRef<SpeechCue | null>(null);
   const gestureRef = useRef(gesture);
   gestureRef.current = gesture;
@@ -735,6 +738,7 @@ export function AgentAvatar({
         scene.skipFrustumClipping = true;
 
         const camera = new B.ArcRotateCamera("agent-cam", Math.PI / 2, 1.42, 2.35, new B.Vector3(0, 1.18, 0), scene);
+        cameraRef.current = camera;
         camera.panningSensibility = 0;
         if (variant === "stage" || variant === "bay") camera.attachControl(canvasRef.current, true);
         if (variant === "bay") {
@@ -785,6 +789,8 @@ export function AgentAvatar({
         const result = await importGlb(source);
         if (disposed) return;
         frameAvatar(B, camera, result.meshes?.[0], scene, variant);
+        cameraHomeRadiusRef.current = camera.radius;
+        cameraTargetRadiusRef.current = camera.radius;
         tintOutfit(B, geometryMeshes(result.meshes?.[0], null), rig.accent);
         const idleAnimation = playIdle(result);
         armsRef.current = createBodyDriver(B, scene, result.meshes?.[0], idleAnimation);
@@ -800,7 +806,12 @@ export function AgentAvatar({
           lipsRef.current?.speak(pendingRef.current.text, pendingRef.current.durationMs);
         }
 
-        engine.runRenderLoop(() => scene?.render());
+        engine.runRenderLoop(() => {
+          if (cameraRef.current) {
+            cameraRef.current.radius += (cameraTargetRadiusRef.current - cameraRef.current.radius) * 0.075;
+          }
+          scene?.render();
+        });
         onResize = () => engine?.resize();
         window.addEventListener("resize", onResize);
         const canvas = canvasRef.current;
@@ -825,6 +836,7 @@ export function AgentAvatar({
       stationRef.current = null;
       headsetRef.current?.dispose();
       headsetRef.current = null;
+      cameraRef.current = null;
       observer?.disconnect();
       if (onResize) window.removeEventListener("resize", onResize);
       scene?.dispose();
@@ -847,6 +859,9 @@ export function AgentAvatar({
   useEffect(() => {
     headsetRef.current?.setLive(headsetLive || speaking);
     stationRef.current?.setLive(headsetLive || speaking);
+    cameraTargetRadiusRef.current = speaking
+      ? cameraHomeRadiusRef.current * 0.78
+      : cameraHomeRadiusRef.current;
   }, [headsetLive, speaking]);
 
   useEffect(() => {

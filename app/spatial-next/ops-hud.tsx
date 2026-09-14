@@ -179,6 +179,27 @@ export function OpsHud() {
           <span>{t("What happens next")}</span>
           <small>{phase >= 0 ? `${phase + 1}/${OPS_PHASES.length}` : "0/6"}</small>
         </div>
+
+        {!mission ? (
+          <div className="mission-launcher">
+            <strong>{t("Launch a mission")}</strong>
+            <label className="rail-intent">
+              {t("Mission intent")}
+              <input value={intent} onChange={(event) => setIntent(event.target.value)} />
+            </label>
+            <button type="button" className="mission-launch-button" onClick={() => deploy(intent)}>
+              <span aria-hidden="true">▶</span>
+              <span><b>{t("Deploy mission")}</b><small>{t("Brief and activate the squad")}</small></span>
+            </button>
+          </div>
+        ) : (
+          <div className="active-mission-card">
+            <span>{world.running ? t("Mission executing") : t("Mission on hold")}</span>
+            <strong>{title}</strong>
+            <small>{t("Now: {phase}", { phase: phaseTitle })}</small>
+          </div>
+        )}
+
         <ol className="phase-list">
           {OPS_PHASES.map((item, index) => (
             <li key={item} className={index < phase ? "is-done" : index === phase ? "is-now" : ""}>
@@ -214,18 +235,13 @@ export function OpsHud() {
         {world.compliance.disputes ? <p className="rail-alert">{t("Dispute open — funds stay locked")}</p> : null}
         {world.compliance.policyKills ? <p className="rail-alert is-soft">{t(world.compliance.policyKills === 1 ? "{n} route killed by policy" : "{n} routes killed by policy", { n: world.compliance.policyKills })}</p> : null}
 
-        {!mission ? (
-          <label className="rail-intent">
-            {t("Mission intent")}
-            <input value={intent} onChange={(event) => setIntent(event.target.value)} />
-          </label>
-        ) : null}
-
         <div className="rail-commands">
-          <button type="button" className="cmd-primary" disabled={stick.disabled} onClick={stick.onPrimary}>
-            <kbd>{stick.primaryHint}</kbd>
-            {stick.primary}
-          </button>
+          {mission ? (
+            <button type="button" className="cmd-primary" disabled={stick.disabled} onClick={stick.onPrimary}>
+              <kbd>{stick.primaryHint}</kbd>
+              {stick.primary}
+            </button>
+          ) : null}
           <button type="button" className={stick.mode === "gate" ? "cmd-kill" : "cmd-scan"} disabled={stick.disabled && stick.mode !== "gate"} onClick={stick.onSecondary}>
             <kbd>{stick.secondaryHint}</kbd>
             {stick.secondary}
@@ -241,6 +257,18 @@ export function OpsHud() {
       </aside>
 
       <section className={`mission-stage${stageLive ? " is-live" : ""}${world.gate ? " is-gate" : ""}`} style={{ ["--agent-accent" as string]: selected.accent }}>
+        <div className="stage-mission-banner" aria-live="polite">
+          <span className={mission && world.running ? "is-running" : ""}>{mission && world.running ? t("Executing") : t("Ready")}</span>
+          <div>
+            <small>{t("Mission in command")}</small>
+            <strong>{title}</strong>
+          </div>
+          <div>
+            <small>{t("Current step")}</small>
+            <strong>{phaseTitle}</strong>
+          </div>
+          <b>{world.compliance.completionPct}%</b>
+        </div>
         <SquadStage />
         {world.gate ? (
           <div className="stage-gate">

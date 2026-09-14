@@ -197,7 +197,8 @@ function readPairLayout(): PairLayout {
 export function SquadStage() {
   const { world, audibleId, select, promoteVoice, holdVoice, releaseVoice, agentWantsVoice } = useOps();
   const { t } = useSpatialI18n();
-  const [view, setView] = useState<StageView>("list");
+  const [view, setView] = useState<StageView>("cards");
+  const [autoFocus, setAutoFocus] = useState(true);
   const [pairLayout, setPairLayout] = useState<PairLayout>("side");
   const [singleIndex, setSingleIndex] = useState(0);
   const [visible, setVisible] = useState<string[]>(() => OPS_AGENTS.slice(0, LIVE_CAP).map((agent) => agent.id));
@@ -267,7 +268,7 @@ export function SquadStage() {
         if (id) seen.set(id, entry.isIntersecting);
       }
       setVisible(squad.filter((id) => seen.get(id)));
-    }, { root: view === "cards" ? null : root, threshold: 0.2 });
+    }, { root, threshold: 0.2 });
     const nodes = root.querySelectorAll<HTMLElement>("[data-agent]");
     for (const node of nodes) observer.observe(node);
     return () => observer.disconnect();
@@ -286,7 +287,7 @@ export function SquadStage() {
 
   useEffect(() => {
     const root = stripRef.current;
-    if (view !== "list" || !root) {
+    if (view === "single" || !root) {
       setStripOverflow({ left: false, right: false });
       return;
     }
@@ -312,6 +313,14 @@ export function SquadStage() {
       observer?.disconnect();
     };
   }, [view, squad.length, pairLayout]);
+
+  useEffect(() => {
+    if (!autoFocus || !audibleId || !squad.includes(audibleId)) return;
+    const index = squad.indexOf(audibleId);
+    setSingleIndex(index);
+    setView("single");
+    if (world.selectedId !== audibleId) select(audibleId, { takeFloor: false });
+  }, [audibleId, autoFocus, select, squad, world.selectedId]);
 
   const scrollStrip = (dir: -1 | 1) => {
     const root = stripRef.current;
@@ -470,6 +479,14 @@ export function SquadStage() {
         </div>
         <button
           type="button"
+          className={`speaker-follow${autoFocus ? " is-on" : ""}`}
+          aria-pressed={autoFocus}
+          onClick={() => setAutoFocus((current) => !current)}
+        >
+          <span aria-hidden="true">◉</span> {t("Follow speaker")}
+        </button>
+        <button
+          type="button"
           className={`aura-launch${auraTarget && poseFor(auraTarget) === "farmAura" ? " is-on" : ""}`}
           aria-pressed={Boolean(auraTarget && poseFor(auraTarget) === "farmAura")}
           onClick={() => {
@@ -497,7 +514,7 @@ export function SquadStage() {
         </div>
       ) : (
         <div className={view === "list" ? "bay-strip-wrap" : "bay-cards-host"}>
-          {view === "list" && stripOverflow.left ? (
+          {stripOverflow.left ? (
             <button
               type="button"
               className="strip-arrow is-left"
@@ -514,7 +531,7 @@ export function SquadStage() {
               </div>
             ))}
           </div>
-          {view === "list" && stripOverflow.right ? (
+          {stripOverflow.right ? (
             <button
               type="button"
               className="strip-arrow is-right"
