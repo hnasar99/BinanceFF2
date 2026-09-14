@@ -96,6 +96,12 @@
 .body-dock{position:absolute;right:8px;bottom:8px;z-index:3;display:flex;flex-wrap:wrap;gap:4px;max-width:62%;justify-content:flex-end}
 .body-dock button{padding:5px 7px;border:1px solid rgba(255,255,255,.16);background:rgba(2,6,14,.86);color:#fff;font:inherit;font-size:10px;letter-spacing:.06em;text-transform:uppercase;cursor:pointer}
 .body-dock button.is-on{border-color:#f3ba2f;background:rgba(243,186,47,.2);color:#f3ba2f}
+.aura-launch{border-color:rgba(243,186,47,.68)!important;background:linear-gradient(135deg,rgba(243,186,47,.24),rgba(255,111,0,.16))!important;color:#ffd76a!important;font-weight:800;box-shadow:0 0 16px rgba(243,186,47,.14)}
+.aura-launch.is-on{background:#f3ba2f!important;color:#07090d!important;animation:auraButtonPulse .72s ease-in-out infinite alternate}
+.aura-live-badge{position:absolute;left:50%;top:10px;z-index:5;transform:translateX(-50%);display:flex;align-items:center;gap:7px;padding:6px 10px;border:1px solid #f3ba2f;background:rgba(8,6,2,.84);color:#ffd76a;font-size:11px;font-weight:800;letter-spacing:.16em;box-shadow:0 0 24px rgba(243,186,47,.42);pointer-events:none}
+.aura-live-badge span{width:7px;height:7px;border-radius:50%;background:#f3ba2f;box-shadow:0 0 12px #f3ba2f;animation:auraButtonPulse .5s ease-in-out infinite alternate}
+.agent-bay:has(.aura-live-badge) .bay-viewport{box-shadow:inset 0 0 70px rgba(243,186,47,.22)}
+@keyframes auraButtonPulse{from{filter:brightness(.86);transform:scale(.985)}to{filter:brightness(1.2);transform:scale(1.02)}}
 .agent-bay.is-live{outline:1px solid var(--agent-accent)}
 .bay-viewport{position:relative;min-height:140px;overflow:hidden;background:#05070d}
 .bay-photo,.bay-double{min-height:0;min-width:0}

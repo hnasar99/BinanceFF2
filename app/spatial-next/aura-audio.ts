@@ -14,19 +14,19 @@ function stopActiveTrack() {
 
 function playFallbackPulse() {
   const AudioCtor = window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-  if (!AudioCtor) return;
+  if (!AudioCtor) return null;
   fallbackContext ??= new AudioCtor();
   const context = fallbackContext;
   void context.resume().catch(() => undefined);
   const master = context.createGain();
   const now = context.currentTime;
   master.gain.setValueAtTime(0.0001, now);
-  master.gain.exponentialRampToValueAtTime(0.18, now + 0.08);
-  master.gain.setValueAtTime(0.18, now + 7.6);
+  master.gain.exponentialRampToValueAtTime(0.34, now + 0.08);
+  master.gain.setValueAtTime(0.34, now + 7.6);
   master.gain.exponentialRampToValueAtTime(0.0001, now + 8.4);
   master.connect(context.destination);
 
-  const notes = [55, 82.41, 65.41, 98, 55, 110, 73.42, 82.41];
+  const notes = [55, 82.41, 65.41, 98, 55, 110, 73.42, 82.41, 55, 82.41, 65.41, 110, 73.42, 98, 82.41, 110];
   notes.forEach((frequency, index) => {
     const start = now + index * 0.52;
     const oscillator = context.createOscillator();
@@ -41,10 +41,13 @@ function playFallbackPulse() {
     oscillator.start(start);
     oscillator.stop(start + 0.46);
   });
+  return { context, master };
 }
 
 export async function playAuraMusic() {
   stopActiveTrack();
+  // Start the audible cue inside the click gesture so browser autoplay policy cannot swallow it.
+  const fallback = playFallbackPulse();
   const audio = new Audio(LICENSED_AURA_TRACK);
   audio.preload = "auto";
   audio.volume = 0.72;
@@ -52,6 +55,7 @@ export async function playAuraMusic() {
   activeTrack = audio;
   try {
     await audio.play();
+    if (fallback) fallback.master.gain.setTargetAtTime(0.0001, fallback.context.currentTime, 0.08);
     window.setTimeout(() => {
       if (activeTrack !== audio) return;
       const fade = window.setInterval(() => {
@@ -63,6 +67,5 @@ export async function playAuraMusic() {
     }, 7800);
   } catch {
     if (activeTrack === audio) activeTrack = null;
-    playFallbackPulse();
   }
 }

@@ -126,6 +126,7 @@ function AgentBay({
       onMouseLeave={onHoverLeave}
     >
       <div className="bay-viewport">
+        {bodyPose === "farmAura" ? <div className="aura-live-badge"><span /> AURA MODE</div> : null}
         <div className="bay-photo">
           <img className="bay-still" src={agent.portrait} alt={t("{name} portrait", { name: agent.name })} />
         </div>
@@ -414,6 +415,7 @@ export function SquadStage() {
   }, [view, squad, select]);
 
   const currentId = squad[singleIndex] ?? squad[0];
+  const auraTarget = world.selectedId && squad.includes(world.selectedId) ? world.selectedId : currentId;
 
   const bay = (id: string, compact: boolean, extra: { live: boolean; focused: boolean }) => (
     <AgentBay
@@ -466,6 +468,20 @@ export function SquadStage() {
             </button>
           ))}
         </div>
+        <button
+          type="button"
+          className={`aura-launch${auraTarget && poseFor(auraTarget) === "farmAura" ? " is-on" : ""}`}
+          aria-pressed={Boolean(auraTarget && poseFor(auraTarget) === "farmAura")}
+          onClick={() => {
+            if (!auraTarget) return;
+            setSingleIndex(Math.max(0, squad.indexOf(auraTarget)));
+            setView("single");
+            select(auraTarget, { takeFloor: false });
+            setPose(auraTarget, "farmAura");
+          }}
+        >
+          ⚡ {t("Farm aura")}
+        </button>
         {view === "single" && currentId ? (
           <span className="view-index">{singleIndex + 1} / {squad.length} · {rosterAgent(currentId).name}</span>
         ) : (

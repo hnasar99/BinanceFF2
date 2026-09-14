@@ -176,9 +176,9 @@ function playIdle(result: any) {
   const idle = animations.find((item: { name: string }) => /idle|rest|breath|stand/i.test(item.name) && !skip.test(item.name));
   if (idle) {
     idle.start(true);
-    return true;
+    return idle;
   }
-  return false;
+  return null;
 }
 
 type Limb = { bone: any; mesh: any; node: any; bindQ: any };
@@ -287,7 +287,7 @@ function withOffsets(base: AxisPose, extras: AxisPose[]) {
   }));
 }
 
-function createBodyDriver(B: any, scene: any) {
+function createBodyDriver(B: any, scene: any, root: any, idleAnimation: any) {
   const leftArm = captureLimb(B, scene, limbPattern("Left", "Arm"));
   const rightArm = captureLimb(B, scene, limbPattern("Right", "Arm"));
   const leftFore = captureLimb(B, scene, limbPattern("Left", "ForeArm"));
@@ -386,6 +386,8 @@ function createBodyDriver(B: any, scene: any) {
   let auraSession = 0;
   let auraVariant = 0;
   let auraStartedAt = 0;
+  const rootHome = root?.position?.clone?.();
+  const rootYaw = root?.rotation?.y ?? 0;
 
   const lerp = (a: AxisPose, b: AxisPose, t: number): AxisPose => ({
     ax: a.ax + (b.ax - a.ax) * t,
@@ -403,6 +405,11 @@ function createBodyDriver(B: any, scene: any) {
       const cycle = (elapsed / speed) % 1;
       const mirror = auraVariant % 2 === 0 ? 1 : -1;
       const sway = Math.sin(cycle * Math.PI * 2) * (0.14 + auraVariant * 0.018) * mixFarm;
+      if (root?.position && rootHome) {
+        root.position.y = rootHome.y + Math.abs(Math.sin(elapsed / 310)) * 0.055 * mixFarm;
+        root.position.x = rootHome.x + Math.sin(elapsed / 460) * 0.08 * mixFarm * mirror;
+      }
+      if (root?.rotation) root.rotation.y = rootYaw + Math.sin(elapsed / 620) * 0.12 * mixFarm;
       const phase = cycle < 1 / 3 ? 0 : cycle < 2 / 3 ? 1 : 2;
       const local = cycle < 1 / 3 ? cycle * 3 : cycle < 2 / 3 ? (cycle - 1 / 3) * 3 : (cycle - 2 / 3) * 3;
       poseLimb(B, hips, 0, sway * mirror, 0);
@@ -438,6 +445,8 @@ function createBodyDriver(B: any, scene: any) {
     const reach = lerp(restL, operateL, mixOperate);
     const reachR = lerp(restR, operateR, mixOperate);
     const type = mixOperate * Math.sin(performance.now() / 140) * 0.045;
+    if (root?.position && rootHome) root.position.copyFrom(rootHome);
+    if (root?.rotation) root.rotation.y = rootYaw;
     poseLimb(B, hips, 0, 0, 0);
     poseLimb(B, spine, mixOperate * 0.08, 0, 0);
     poseLimb(B, head, mixOperate * 0.18 - mixPoint * 0.08, mixPoint * 0.22, 0);
@@ -465,7 +474,12 @@ function createBodyDriver(B: any, scene: any) {
 
   return {
     setPose(next: BodyPose) {
-      if (next === "farmAura" && pose !== "farmAura") auraStartedAt = performance.now();
+      if (next === "farmAura" && pose !== "farmAura") {
+        auraStartedAt = performance.now();
+        idleAnimation?.pause?.();
+      } else if (next !== "farmAura" && pose === "farmAura") {
+        idleAnimation?.play?.(true);
+      }
       pose = next;
     },
     startAura(session: number) {
@@ -473,6 +487,7 @@ function createBodyDriver(B: any, scene: any) {
       auraSession = session;
       auraVariant = Math.abs(session) % 4;
       auraStartedAt = performance.now();
+      idleAnimation?.pause?.();
       pose = "farmAura";
     },
     dispose() {
@@ -771,8 +786,8 @@ export function AgentAvatar({
         if (disposed) return;
         frameAvatar(B, camera, result.meshes?.[0], scene, variant);
         tintOutfit(B, geometryMeshes(result.meshes?.[0], null), rig.accent);
-        playIdle(result);
-        armsRef.current = createBodyDriver(B, scene);
+        const idleAnimation = playIdle(result);
+        armsRef.current = createBodyDriver(B, scene, result.meshes?.[0], idleAnimation);
         armsRef.current.setPose(gestureRef.current);
         headsetRef.current = createHeadset(B, scene, rig.accent);
         headsetRef.current?.setWorn(headsetOnRef.current);
