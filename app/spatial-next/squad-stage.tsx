@@ -5,6 +5,7 @@ import { OPS_AGENTS, rosterAgent, type OpsCheck } from "@/lib/ops-sim";
 import { useSpatialI18n } from "../spatial/i18n-context";
 import { AgentAvatar, type BodyPose } from "./agent-avatar";
 import { useOps } from "./ops-context";
+import { playAuraMusic } from "./aura-audio";
 
 const LIVE_CAP = 2;
 const HOVER_DWELL_MS = 250;
@@ -70,6 +71,7 @@ function AgentBay({
   pointing,
   pairLayout,
   bodyPose,
+  auraSession,
   onBodyPose,
   onSelect,
   onFocus,
@@ -84,6 +86,7 @@ function AgentBay({
   pointing: boolean;
   pairLayout: PairLayout;
   bodyPose: BodyPose;
+  auraSession: number;
   onBodyPose: (next: BodyPose) => void;
   onSelect: () => void;
   onFocus: () => void;
@@ -137,6 +140,7 @@ function AgentBay({
               headset
               headsetLive={headsetOn}
               checks={checks}
+              auraSession={auraSession}
             />
           ) : (
             <span className="bay-double-wait">{t("3D when in view")}</span>
@@ -200,6 +204,10 @@ export function SquadStage() {
   const doneRef = useRef<Record<string, number>>({});
   const [pointingId, setPointingId] = useState<string | null>(null);
   const [bodyPoses, setBodyPoses] = useState<Record<string, BodyPose>>({});
+  const [auraSessions, setAuraSessions] = useState<Record<string, number>>({});
+  const auraTimers = useRef<Record<string, number>>({});
+  const auraCooldowns = useRef<Record<string, number>>({});
+  const previousMissionStatus = useRef(world.mission?.status);
   const [stripOverflow, setStripOverflow] = useState({ left: false, right: false });
   const hoverTimer = useRef(0);
   const hoveringId = useRef<string | null>(null);
@@ -312,11 +320,38 @@ export function SquadStage() {
     root.scrollBy({ left: dir * (width + 8), behavior: "smooth" });
   };
 
-  const setPose = (id: string, next: BodyPose) => {
+  const setPose = (id: string, next: BodyPose, automatic = false) => {
+    if (next === "farmAura") {
+      const now = Date.now();
+      if (!automatic && (auraCooldowns.current[id] ?? 0) > now) return;
+      auraCooldowns.current[id] = now + (automatic ? 120_000 : 150_000);
+      window.clearTimeout(auraTimers.current[id]);
+      setAuraSessions((current) => ({ ...current, [id]: (current[id] ?? 0) + 1 }));
+      void playAuraMusic();
+      auraTimers.current[id] = window.setTimeout(() => {
+        setBodyPoses((current) => ({ ...current, [id]: "operate" }));
+      }, 9000);
+    }
     setBodyPoses((current) => ({ ...current, [id]: next }));
   };
 
   const poseFor = (id: string): BodyPose => bodyPoses[id] ?? "operate";
+
+  useEffect(() => {
+    const status = world.mission?.status;
+    if (status === "settled" && previousMissionStatus.current !== "settled") {
+      const hero = world.assigned.includes("executor") ? "executor" : world.selectedId;
+      setSingleIndex(Math.max(0, squad.indexOf(hero)));
+      setView("single");
+      select(hero, { takeFloor: false });
+      setPose(hero, "farmAura", true);
+    }
+    previousMissionStatus.current = status;
+  }, [select, squad, world.assigned, world.mission?.status, world.selectedId]);
+
+  useEffect(() => () => {
+    Object.values(auraTimers.current).forEach((timer) => window.clearTimeout(timer));
+  }, []);
 
   const onHoverEnter = (id: string) => {
     window.clearTimeout(hoverTimer.current);
@@ -389,6 +424,7 @@ export function SquadStage() {
       pointing={poseFor(id) === "operate" && (audibleId === id || pointingId === id)}
       pairLayout={pairLayout}
       bodyPose={poseFor(id)}
+      auraSession={auraSessions[id] ?? 0}
       onBodyPose={(next) => setPose(id, next)}
       onSelect={() => select(id, { takeFloor: false })}
       onFocus={() => (compact ? openSingle(id) : setView("list"))}

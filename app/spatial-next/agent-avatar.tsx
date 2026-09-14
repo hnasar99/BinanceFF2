@@ -383,6 +383,9 @@ function createBodyDriver(B: any, scene: any) {
   let mixPoint = 0;
   let mixOperate = 1;
   let mixFarm = 0;
+  let auraSession = 0;
+  let auraVariant = 0;
+  let auraStartedAt = 0;
 
   const lerp = (a: AxisPose, b: AxisPose, t: number): AxisPose => ({
     ax: a.ax + (b.ax - a.ax) * t,
@@ -395,23 +398,26 @@ function createBodyDriver(B: any, scene: any) {
     mixOperate += ((pose === "operate" ? 1 : 0) - mixOperate) * 0.12;
     mixFarm += ((pose === "farmAura" ? 1 : 0) - mixFarm) * 0.1;
     if (mixFarm > 0.12) {
-      const cycle = (performance.now() / 2400) % 1;
-      const sway = Math.sin(cycle * Math.PI * 2) * 0.18 * mixFarm;
+      const elapsed = Math.max(0, performance.now() - auraStartedAt);
+      const speed = [2380, 2700, 2180, 2520][auraVariant];
+      const cycle = (elapsed / speed) % 1;
+      const mirror = auraVariant % 2 === 0 ? 1 : -1;
+      const sway = Math.sin(cycle * Math.PI * 2) * (0.14 + auraVariant * 0.018) * mixFarm;
       const phase = cycle < 1 / 3 ? 0 : cycle < 2 / 3 ? 1 : 2;
       const local = cycle < 1 / 3 ? cycle * 3 : cycle < 2 / 3 ? (cycle - 1 / 3) * 3 : (cycle - 2 / 3) * 3;
-      poseLimb(B, hips, 0, sway, 0);
-      poseLimb(B, spine, 0.05 * mixFarm, sway * 0.55, 0);
-      poseLimb(B, head, 0.04 * mixFarm, sway * 0.28, 0);
+      poseLimb(B, hips, 0, sway * mirror, 0);
+      poseLimb(B, spine, (0.035 + auraVariant * 0.008) * mixFarm, sway * 0.55 * mirror, 0);
+      poseLimb(B, head, 0.04 * mixFarm, sway * 0.28 * mirror, Math.sin(elapsed / 710) * 0.035 * mixFarm);
       poseLimb(B, leftShoulder, 0.1 * mixFarm, 0, 0.2 + sway * 0.12);
       poseLimb(B, rightShoulder, 0.1 * mixFarm, 0, -(0.2 + sway * 0.12));
-      if (phase === 0) {
+      if ((phase + auraVariant) % 3 === 0) {
         poseLimb(B, leftArm, hangL.ax - 0.85 * mixFarm, hangL.ay + 0.38 * mixFarm, hangL.az + 0.42 * mixFarm);
         poseLimb(B, rightArm, hangR.ax + 0.18 * mixFarm, hangR.ay - 0.16 * mixFarm, hangR.az - 0.95 * mixFarm);
         poseLimb(B, leftFore, -0.42 * mixFarm, 0, 0);
         poseLimb(B, rightFore, -1.15 * mixFarm, 0, 0.28 * mixFarm);
         poseLimb(B, leftHand, 0.15 * mixFarm, 0, 0);
         poseLimb(B, rightHand, 0.1 * mixFarm, 0, 0);
-      } else if (phase === 1) {
+      } else if ((phase + auraVariant) % 3 === 1) {
         const roll = local * Math.PI * 2;
         poseLimb(B, leftArm, hangL.ax - 0.42 * mixFarm, hangL.ay + (0.55 + Math.sin(roll) * 0.35) * mixFarm, hangL.az + 0.22 * mixFarm);
         poseLimb(B, rightArm, hangR.ax - 0.42 * mixFarm, hangR.ay - (0.55 + Math.sin(roll + Math.PI) * 0.35) * mixFarm, hangR.az - 0.22 * mixFarm);
@@ -459,7 +465,15 @@ function createBodyDriver(B: any, scene: any) {
 
   return {
     setPose(next: BodyPose) {
+      if (next === "farmAura" && pose !== "farmAura") auraStartedAt = performance.now();
       pose = next;
+    },
+    startAura(session: number) {
+      if (session === auraSession) return;
+      auraSession = session;
+      auraVariant = Math.abs(session) % 4;
+      auraStartedAt = performance.now();
+      pose = "farmAura";
     },
     dispose() {
       scene.onBeforeRenderObservable.remove(observer);
@@ -641,6 +655,7 @@ export function AgentAvatar({
   headset = false,
   headsetLive = false,
   checks = [],
+  auraSession = 0,
 }: {
   agentId: string;
   speech?: SpeechCue | null;
@@ -650,6 +665,7 @@ export function AgentAvatar({
   headset?: boolean;
   headsetLive?: boolean;
   checks?: OpsCheck[];
+  auraSession?: number;
 }) {
   const { t, line, locale } = useSpatialI18n();
   const rig = agentRig(agentId);
@@ -804,6 +820,10 @@ export function AgentAvatar({
   useEffect(() => {
     armsRef.current?.setPose(gesture);
   }, [gesture]);
+
+  useEffect(() => {
+    if (auraSession > 0) armsRef.current?.startAura(auraSession);
+  }, [auraSession]);
 
   useEffect(() => {
     headsetRef.current?.setWorn(headset);
