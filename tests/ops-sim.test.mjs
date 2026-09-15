@@ -39,6 +39,18 @@ test("guardian monitor reports a problem when the mandate is unsafe", () => {
   assert.match(world.agents.guardian.task, /problem was detected/);
 });
 
+test("deploy stores brief, criteria and reward from the human draft", () => {
+  const world = deployMission(createOpsWorld(3_000), "Custom job", 3_000, {
+    brief: "A long written brief that must not be truncated.",
+    criteria: "Seal replayable evidence.",
+    reward: "2,400 USDT",
+  });
+  assert.equal(world.mission.brief, "A long written brief that must not be truncated.");
+  assert.equal(world.mission.criteria, "Seal replayable evidence.");
+  assert.equal(world.mission.reward, "2,400 USDT");
+  assert.equal(world.mission.progress, 8);
+});
+
 test("deploy starts a live mission and ticking advances progress plus events", () => {
   let world = deployMission(createOpsWorld(2_000), "Map BNB routes", 2_000);
   assert.equal(world.running, true);

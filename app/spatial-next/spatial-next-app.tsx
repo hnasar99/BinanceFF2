@@ -2,6 +2,7 @@
 
 import { SpatialI18nProvider } from "../spatial/i18n-context";
 import { CinematicOverlay } from "./cinematic-overlay";
+import { OnboardingTour } from "./onboarding-tour";
 import { OpsHud } from "./ops-hud";
 import { OpsProvider } from "./ops-context";
 import "./spatial-next.css";
@@ -12,6 +13,7 @@ export function SpatialNextApp() {
       <OpsProvider>
         <div className="cockpit-root">
           <CinematicOverlay />
+          <OnboardingTour />
           <OpsHud />
         </div>
       </OpsProvider>

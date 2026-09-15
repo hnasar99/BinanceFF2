@@ -3,14 +3,19 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { OPS_AGENTS, rosterAgent, type OpsCheck } from "@/lib/ops-sim";
 import { useSpatialI18n } from "../spatial/i18n-context";
-import { AgentAvatar, type BodyPose } from "./agent-avatar";
+import { AgentAvatar, type BodyPose, type CameraIntent } from "./agent-avatar";
 import { useOps } from "./ops-context";
 import { playAuraMusic } from "./aura-audio";
 
 const LIVE_CAP = 2;
-const HOVER_DWELL_MS = 250;
 type StageView = "list" | "cards" | "single";
 type PairLayout = "side" | "frame" | "overlay";
+
+export type SquadStageHandle = {
+  focusAgent: (id: string) => void;
+  focusBoard: (id: string) => void;
+  returnToScene: () => void;
+};
 
 function BayBoard({ checks, compact }: { checks: OpsCheck[]; compact?: boolean }) {
   const { line } = useSpatialI18n();
@@ -72,12 +77,15 @@ function AgentBay({
   pairLayout,
   bodyPose,
   auraSession,
+  cameraIntent,
+  hovered,
   onBodyPose,
   onSelect,
   onFocus,
   onPromote,
   onHoverEnter,
   onHoverLeave,
+  onBoardPick,
 }: {
   agentId: string;
   live: boolean;
@@ -87,12 +95,15 @@ function AgentBay({
   pairLayout: PairLayout;
   bodyPose: BodyPose;
   auraSession: number;
+  cameraIntent: CameraIntent;
+  hovered: boolean;
   onBodyPose: (next: BodyPose) => void;
   onSelect: () => void;
   onFocus: () => void;
   onPromote: () => void;
   onHoverEnter: () => void;
   onHoverLeave: () => void;
+  onBoardPick: () => void;
 }) {
   const { world, speech, audibleId, agentWantsVoice } = useOps();
   const { t, line } = useSpatialI18n();
@@ -115,11 +126,13 @@ function AgentBay({
     <article
       className={`agent-bay is-${pairLayout}${focused ? " is-focus" : ""}${compact ? " is-compact" : ""}${audible ? " is-live" : ""}`}
       style={{ ["--agent-accent" as string]: agent.accent }}
+      tabIndex={0}
       onClick={onSelect}
       onKeyDown={(event) => {
         if (event.key !== "Enter" && event.key !== " ") return;
         if ((event.target as HTMLElement).closest("button")) return;
         event.preventDefault();
+        event.stopPropagation();
         onSelect();
       }}
       onMouseEnter={onHoverEnter}
@@ -142,11 +155,19 @@ function AgentBay({
               headsetLive={headsetOn}
               checks={checks}
               auraSession={auraSession}
+              cameraIntent={cameraIntent}
+              onBoardPick={onBoardPick}
             />
           ) : (
             <span className="bay-double-wait">{t("3D when in view")}</span>
           )}
         </div>
+        {hovered && !focused ? (
+          <div className="agent-hover-hint" role="tooltip">
+            <b>{agent.name}</b>
+            <span>{state?.task ? line(state.task) : t(agent.role)}</span>
+          </div>
+        ) : null}
         {wanting ? (
           <button
             type="button"
@@ -168,19 +189,34 @@ function AgentBay({
         </header>
         <BayBoard checks={checks} compact={compact} />
         <p className="bay-task">{state?.task ? line(state.task) : ""}</p>
-        {compact ? (
-          <div className="bay-actions">
-            <button
-              type="button"
-              onClick={(event) => {
-                event.stopPropagation();
-                onFocus();
-              }}
-            >
-              {t("Open")}
-            </button>
+        {cameraIntent.mode === "board" ? (
+          <div className="board-readout" aria-label={t("Blackboard")}>
+            <strong>{t("Blackboard")}</strong>
+            {(checks.length ? checks : [{ id: "empty", label: t("No execution data"), done: false }]).map((item) => (
+              <p key={item.id} className={item.done ? "is-done" : ""}>{item.done ? "✓ " : "○ "}{line(item.label)}</p>
+            ))}
           </div>
         ) : null}
+        <div className="bay-actions">
+          <button
+            type="button"
+            onClick={(event) => {
+              event.stopPropagation();
+              onFocus();
+            }}
+          >
+            {t("Open")}
+          </button>
+          <button
+            type="button"
+            onClick={(event) => {
+              event.stopPropagation();
+              onBoardPick();
+            }}
+          >
+            {t("Read blackboard")}
+          </button>
+        </div>
       </div>
     </article>
   );
@@ -194,13 +230,12 @@ function readPairLayout(): PairLayout {
   return saved === "frame" || saved === "overlay" || saved === "side" ? saved : "side";
 }
 
-export function SquadStage() {
-  const { world, audibleId, select, promoteVoice, holdVoice, releaseVoice, agentWantsVoice } = useOps();
+export function SquadStage({ onReady }: { onReady?: (api: SquadStageHandle) => void } = {}) {
+  const { world, audibleId, select, promoteVoice } = useOps();
   const { t } = useSpatialI18n();
   const [view, setView] = useState<StageView>("cards");
-  const [autoFocus, setAutoFocus] = useState(true);
-  const [pairLayout, setPairLayout] = useState<PairLayout>("side");
-  const [singleIndex, setSingleIndex] = useState(0);
+  const [autoFocus, setAutoFocus] = useState(false);
+  const [pairLayout, setPairLayout] = useState<PairLayout>(() => readPairLayout());
   const [visible, setVisible] = useState<string[]>(() => OPS_AGENTS.slice(0, LIVE_CAP).map((agent) => agent.id));
   const stripRef = useRef<HTMLDivElement | null>(null);
   const doneRef = useRef<Record<string, number>>({});
@@ -211,12 +246,9 @@ export function SquadStage() {
   const auraCooldowns = useRef<Record<string, number>>({});
   const previousMissionStatus = useRef(world.mission?.status);
   const [stripOverflow, setStripOverflow] = useState({ left: false, right: false });
-  const hoverTimer = useRef(0);
-  const hoveringId = useRef<string | null>(null);
-
-  useEffect(() => {
-    setPairLayout(readPairLayout());
-  }, []);
+  const [hoverId, setHoverId] = useState<string | null>(null);
+  const [cameraByAgent, setCameraByAgent] = useState<Record<string, CameraIntent>>({});
+  const [sceneLocked, setSceneLocked] = useState(false);
 
   const choosePair = (mode: PairLayout) => {
     setPairLayout(mode);
@@ -227,6 +259,10 @@ export function SquadStage() {
     const ids = world.assigned.length ? world.assigned : OPS_AGENTS.map((agent) => agent.id);
     return ids.filter((id) => world.agents[id]);
   }, [world.assigned, world.agents]);
+  const singleIndex = (() => {
+    const index = squad.indexOf(world.selectedId);
+    return index >= 0 ? index : 0;
+  })();
 
   useEffect(() => {
     for (const id of squad) {
@@ -241,18 +277,6 @@ export function SquadStage() {
     const timer = window.setTimeout(() => setPointingId(null), 2200);
     return () => window.clearTimeout(timer);
   }, [pointingId]);
-
-  useEffect(() => {
-    const selected = squad.indexOf(world.selectedId);
-    if (selected >= 0) setSingleIndex(selected);
-  }, [squad, world.selectedId]);
-
-  useEffect(() => {
-    setBodyPoses((current) => {
-      const kept = world.selectedId ? current[world.selectedId] : undefined;
-      return kept ? { [world.selectedId]: kept } : {};
-    });
-  }, [world.selectedId]);
 
   useEffect(() => {
     if (view === "single") return;
@@ -316,11 +340,10 @@ export function SquadStage() {
 
   useEffect(() => {
     if (!autoFocus || !audibleId || !squad.includes(audibleId)) return;
-    const index = squad.indexOf(audibleId);
-    setSingleIndex(index);
-    setView("single");
-    if (world.selectedId !== audibleId) select(audibleId, { takeFloor: false });
-  }, [audibleId, autoFocus, select, squad, world.selectedId]);
+    const root = stripRef.current;
+    const node = root?.querySelector<HTMLElement>(`[data-agent="${audibleId}"]`);
+    node?.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
+  }, [audibleId, autoFocus, squad]);
 
   const scrollStrip = (dir: -1 | 1) => {
     const root = stripRef.current;
@@ -351,7 +374,6 @@ export function SquadStage() {
     const status = world.mission?.status;
     if (status === "settled" && previousMissionStatus.current !== "settled") {
       const hero = world.assigned.includes("executor") ? "executor" : world.selectedId;
-      setSingleIndex(Math.max(0, squad.indexOf(hero)));
       setView("single");
       select(hero, { takeFloor: false });
       setPose(hero, "farmAura", true);
@@ -363,65 +385,83 @@ export function SquadStage() {
     Object.values(auraTimers.current).forEach((timer) => window.clearTimeout(timer));
   }, []);
 
+  const setCamera = (id: string, mode: CameraIntent["mode"]) => {
+    setCameraByAgent((current) => ({
+      ...current,
+      [id]: { mode, nonce: (current[id]?.nonce ?? 0) + 1 },
+    }));
+    setSceneLocked(mode !== "home");
+  };
+
+  const returnToScene = () => {
+    const id = world.selectedId;
+    if (id) setCamera(id, "home");
+    setView("cards");
+    setSceneLocked(false);
+  };
+
+  const openSingle = (id: string, camera: CameraIntent["mode"] = "agent") => {
+    setView("single");
+    select(id, { takeFloor: false });
+    setCamera(id, camera);
+  };
+
   const onHoverEnter = (id: string) => {
-    window.clearTimeout(hoverTimer.current);
-    hoveringId.current = id;
-    hoverTimer.current = window.setTimeout(() => {
-      if (hoveringId.current === id) holdVoice(id);
-    }, HOVER_DWELL_MS);
+    setHoverId(id);
   };
 
   const onHoverLeave = (id: string) => {
-    window.clearTimeout(hoverTimer.current);
-    if (hoveringId.current === id) hoveringId.current = null;
-    releaseVoice();
+    setHoverId((current) => (current === id ? null : current));
   };
 
-  const openSingle = (id: string) => {
-    const index = Math.max(0, squad.indexOf(id));
-    setSingleIndex(index);
-    setView("single");
-    select(id);
-    if (agentWantsVoice(id)) promoteVoice(id);
-  };
+  const handlersRef = useRef({ openSingle, returnToScene });
+  handlersRef.current = { openSingle, returnToScene };
+
+  const stageHandle = useMemo<SquadStageHandle>(() => ({
+    focusAgent: (id) => handlersRef.current.openSingle(id, "agent"),
+    focusBoard: (id) => handlersRef.current.openSingle(id, "board"),
+    returnToScene: () => handlersRef.current.returnToScene(),
+  }), []);
+
+  useEffect(() => {
+    onReady?.(stageHandle);
+  }, [onReady, stageHandle]);
+
+  useEffect(() => {
+    const onHome = () => handlersRef.current.returnToScene();
+    window.addEventListener("binanceff-scene-home", onHome);
+    return () => window.removeEventListener("binanceff-scene-home", onHome);
+  }, []);
 
   const step = (delta: number) => {
     if (!squad.length) return;
     const next = (singleIndex + delta + squad.length) % squad.length;
-    setSingleIndex(next);
-    select(squad[next]);
-    setBodyPoses((current) => {
-      const copy = { ...current };
-      delete copy[squad[singleIndex]];
-      return copy;
-    });
+    select(squad[next], { takeFloor: false });
+    setCamera(squad[next], "agent");
   };
 
   useEffect(() => {
     if (view !== "single") return;
     const onKey = (event: KeyboardEvent) => {
-      const tag = (event.target as HTMLElement | null)?.tagName;
-      if (tag === "INPUT" || tag === "TEXTAREA") return;
+      const target = event.target as HTMLElement | null;
+      const tag = target?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || target?.isContentEditable) return;
       if (event.key === "ArrowLeft") {
         event.preventDefault();
-        setSingleIndex((index) => {
-          const next = (index - 1 + squad.length) % squad.length;
-          select(squad[next]);
-          return next;
-        });
+        const next = (singleIndex - 1 + squad.length) % squad.length;
+        select(squad[next], { takeFloor: false });
+        setCamera(squad[next], "agent");
       }
       if (event.key === "ArrowRight") {
         event.preventDefault();
-        setSingleIndex((index) => {
-          const next = (index + 1 + squad.length) % squad.length;
-          select(squad[next]);
-          return next;
-        });
+        const next = (singleIndex + 1) % squad.length;
+        select(squad[next], { takeFloor: false });
+        setCamera(squad[next], "agent");
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [view, squad, select]);
+  }, [view, squad, select, singleIndex]);
 
   const currentId = squad[singleIndex] ?? squad[0];
   const auraTarget = world.selectedId && squad.includes(world.selectedId) ? world.selectedId : currentId;
@@ -436,15 +476,18 @@ export function SquadStage() {
       pairLayout={pairLayout}
       bodyPose={poseFor(id)}
       auraSession={auraSessions[id] ?? 0}
+      cameraIntent={cameraByAgent[id] ?? { mode: "home", nonce: 0 }}
+      hovered={hoverId === id}
       onBodyPose={(next) => setPose(id, next)}
-      onSelect={() => select(id, { takeFloor: false })}
-      onFocus={() => (compact ? openSingle(id) : setView("list"))}
+      onSelect={() => openSingle(id, "agent")}
+      onFocus={() => openSingle(id, "agent")}
       onPromote={() => {
         select(id);
         promoteVoice(id);
       }}
       onHoverEnter={() => onHoverEnter(id)}
       onHoverLeave={() => onHoverLeave(id)}
+      onBoardPick={() => openSingle(id, "board")}
     />
   );
 
@@ -479,6 +522,14 @@ export function SquadStage() {
         </div>
         <button
           type="button"
+          className="scene-home"
+          onClick={returnToScene}
+          disabled={view !== "single" && !sceneLocked}
+        >
+          {t("Back to the scene")}
+        </button>
+        <button
+          type="button"
           className={`speaker-follow${autoFocus ? " is-on" : ""}`}
           aria-pressed={autoFocus}
           onClick={() => setAutoFocus((current) => !current)}
@@ -491,9 +542,8 @@ export function SquadStage() {
           aria-pressed={Boolean(auraTarget && poseFor(auraTarget) === "farmAura")}
           onClick={() => {
             if (!auraTarget) return;
-            setSingleIndex(Math.max(0, squad.indexOf(auraTarget)));
-            setView("single");
             select(auraTarget, { takeFloor: false });
+            setView("single");
             setPose(auraTarget, "farmAura");
           }}
         >

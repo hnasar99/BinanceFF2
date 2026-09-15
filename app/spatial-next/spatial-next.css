@@ -7,14 +7,15 @@
 .cockpit-bezel-bl{bottom:8px;left:8px;border-bottom:2px solid;border-left:2px solid}
 .cockpit-bezel-br{bottom:8px;right:8px;border-bottom:2px solid;border-right:2px solid}
 
-.cockpit-hud{position:absolute;inset:0;z-index:8;display:grid;grid-template-columns:minmax(280px,320px) minmax(0,1fr) minmax(280px,340px);grid-template-rows:auto minmax(0,1fr) auto;gap:12px;padding:12px 14px 10px;font-family:inherit}
+.cockpit-hud{position:absolute;inset:0;z-index:8;display:grid;grid-template-columns:minmax(320px,30%) minmax(0,1fr) minmax(220px,22%);grid-template-rows:auto minmax(0,1fr) auto;gap:12px;padding:12px 14px 10px;font-family:inherit}
 .cockpit-hud.is-amber{box-shadow:inset 0 0 80px rgba(243,186,47,.1)}
 .cockpit-hud.is-red{box-shadow:inset 0 0 80px rgba(255,70,70,.14)}
 
-.mission-strip,.mission-rail,.ops-rail,.mission-stage,.rail-commands button,.ms-exit,.ms-tools,.lang-switch button,.stage-gate button,.log-row,.rail-intent input,.speak-badge,.bay-actions button,.view-switch button,.file-nav,.chip-squad button,.chip-go,.strip-arrow,.body-dock button{pointer-events:auto}
+.mission-strip,.mission-rail,.ops-rail,.mission-stage,.rail-commands button,.ms-exit,.ms-tools,.lang-switch button,.stage-gate button,.log-row,.rail-intent input,.speak-badge,.bay-actions button,.view-switch button,.file-nav,.chip-squad button,.chip-go,.strip-arrow,.body-dock button,.ms-mission-toggle,.scene-home,.bounty-editor input,.bounty-editor textarea,.bounty-editor button,.task-agent,.ops-tour button,.ops-tip,.board-open,.task-card button{pointer-events:auto}
+.cockpit-hud button:focus-visible,.cockpit-hud a:focus-visible,.cockpit-hud input:focus-visible,.cockpit-hud textarea:focus-visible,.cockpit-hud select:focus-visible{outline:2px solid #f3ba2f;outline-offset:2px}
 
 .mission-strip{grid-column:1/-1;display:grid;grid-template-columns:minmax(120px,160px) minmax(0,1.4fr) minmax(140px,220px) minmax(110px,160px) 88px 72px auto;align-items:center;gap:14px;padding:10px 14px;background:linear-gradient(180deg,rgba(8,14,24,.92),rgba(4,8,16,.78));border:1px solid rgba(255,255,255,.08);backdrop-filter:blur(12px)}
-.ms-brand span,.ms-title span,.ms-phase span,.ms-progress span,.ms-status span,.ms-clock span{display:block;font-size:10px;letter-spacing:.12em;text-transform:uppercase;opacity:.55;margin-bottom:2px}
+.ms-brand span,.ms-title span,.ms-phase span,.ms-progress span,.ms-status span,.ms-clock span{display:block;font-size:10px;letter-spacing:.12em;text-transform:uppercase;opacity:.78;margin-bottom:2px}
 .ms-brand strong,.ms-title strong,.ms-phase strong{display:block;font-size:15px;letter-spacing:.02em;line-height:1.25}
 .ms-title strong{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .ms-progress{display:flex;flex-direction:column;gap:4px}
@@ -28,6 +29,7 @@
 .ms-clock strong{font-size:18px;font-variant-numeric:tabular-nums}
 .ms-exit{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:#02050c;background:#f3ba2f;padding:10px 12px;text-decoration:none;font-weight:800}
 .ms-tools{display:flex;align-items:center;gap:8px;justify-self:end}
+.ms-mission-toggle{padding:8px 10px;border:1px solid rgba(255,255,255,.16);background:rgba(255,255,255,.05);color:#fff;font:inherit;font-size:11px;letter-spacing:.08em;text-transform:uppercase;cursor:pointer}
 .lang-switch{display:flex;gap:3px}
 .lang-switch button{min-width:36px;padding:8px 7px;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.04);color:#b9c5d6;font:inherit;font-size:11px;letter-spacing:.1em;cursor:pointer}
 .lang-switch button.is-on{border-color:#f3ba2f;background:rgba(243,186,47,.2);color:#f3ba2f}
@@ -35,7 +37,7 @@
 .mission-rail,.ops-rail{min-height:0;display:flex;flex-direction:column;gap:10px;padding:12px;background:rgba(3,8,18,.86);border:1px solid rgba(255,255,255,.08);backdrop-filter:blur(14px);overflow:auto}
 .mission-rail{grid-column:1;grid-row:2}
 .ops-rail{grid-column:3;grid-row:2}
-.rail-head{display:flex;justify-content:space-between;align-items:baseline;font-size:11px;letter-spacing:.14em;text-transform:uppercase;opacity:.7}
+.rail-head{display:flex;justify-content:space-between;align-items:baseline;font-size:11px;letter-spacing:.14em;text-transform:uppercase;opacity:.82}
 .phase-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
 .phase-list li{display:grid;grid-template-columns:28px minmax(0,1fr);gap:8px;align-items:center;padding:6px 8px;border:1px solid rgba(255,255,255,.06);background:rgba(255,255,255,.02)}
 .phase-list em{width:28px;height:28px;display:grid;place-items:center;font-style:normal;font-size:12px;border:1px solid rgba(255,255,255,.16)}
@@ -83,7 +85,9 @@
 .view-switch button{padding:6px 10px;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.04);color:#fff;font:inherit;font-size:11px;letter-spacing:.08em;text-transform:uppercase;cursor:pointer}
 .view-switch button.is-on{border-color:#f3ba2f;background:rgba(243,186,47,.16);color:#f3ba2f}
 .view-index{margin-left:auto;font-size:11px;letter-spacing:.08em;opacity:.6}
-.speaker-follow{margin-left:auto!important}.speaker-follow span{color:#50e3a4}.speaker-follow.is-on{border-color:#50e3a4!important;background:rgba(80,227,164,.12)!important;color:#dfffee!important}
+.scene-home{margin-left:auto}
+.speaker-follow span{color:#50e3a4}
+.speaker-follow.is-on{border-color:#50e3a4!important;background:rgba(80,227,164,.12)!important;color:#dfffee!important}
 .squad-stage.is-focus{display:grid;grid-template-rows:minmax(0,1fr) 150px;gap:8px;height:100%;min-height:0;padding:8px}
 .squad-hero{min-height:0;overflow:hidden}
 .squad-hero .agent-bay,.squad-single .agent-bay{height:100%;display:grid;grid-template-columns:minmax(0,1.15fr) minmax(200px,260px);gap:8px}
@@ -196,11 +200,64 @@
 @keyframes stageFade{from{opacity:0}to{opacity:1}}
 @keyframes lineIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
 
+.rail-glossary{display:flex;flex-wrap:wrap;gap:8px;margin:0}
+.ops-tip{display:inline-flex;align-items:center;gap:4px;padding:4px 8px;border:1px solid rgba(255,255,255,.16);background:rgba(255,255,255,.05);color:#f4f7fb;font-size:11px;letter-spacing:.08em;text-transform:uppercase;text-decoration:none;cursor:help}
+.ops-tip span{width:14px;height:14px;border-radius:50%;border:1px solid #f3ba2f;color:#f3ba2f;display:grid;place-items:center;font-size:9px}
+.bounty-editor,.mission-brief-card,.task-block,.board-panel{display:flex;flex-direction:column;gap:10px;padding:12px;border:1px solid rgba(255,255,255,.1);background:rgba(0,0,0,.22)}
+.bounty-editor.is-tour,.task-block.is-tour,.board-panel.is-tour,.mission-rail.is-tour{outline:2px solid #f3ba2f;outline-offset:2px}
+.bounty-editor header p,.mission-brief-card p{margin:0;font-size:13px;line-height:1.45;color:#d5deea}
+.bounty-editor label{display:flex;flex-direction:column;gap:6px;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#f3ba2f}
+.bounty-editor input,.bounty-editor textarea{width:100%;box-sizing:border-box;border:1px solid rgba(255,255,255,.16);background:#050910;color:#fff;padding:10px 12px;font:inherit;font-size:14px;letter-spacing:0;text-transform:none;line-height:1.45}
+.bounty-editor textarea{min-height:140px;max-height:240px;overflow:auto;resize:vertical}
+.bounty-editor-actions{display:grid;gap:8px}
+.mission-brief-card>span{font-size:10px;letter-spacing:.13em;text-transform:uppercase;color:#50e3a4}
+.mission-brief-card h2{margin:0;font-size:18px;line-height:1.3}
+.mission-brief-card h3{margin:0;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:#f3ba2f}
+.mission-brief-card ul,.task-card ul{margin:0;padding-left:18px;font-size:13px;line-height:1.45;color:#d5deea}
+.mission-reward{color:#f3ba2f!important;font-weight:800}
+.task-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+.task-card{padding:10px;border:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.03)}
+.task-card header{display:grid;grid-template-columns:28px minmax(0,1fr);gap:8px;align-items:center;margin-bottom:8px}
+.task-card em{width:28px;height:28px;display:grid;place-items:center;font-style:normal;border:1px solid rgba(255,255,255,.2)}
+.task-card.is-completed em{background:#50e3a4;border-color:#50e3a4;color:#02140c}
+.task-card.is-now,.task-card.is-running{border-color:rgba(243,186,47,.55);background:rgba(243,186,47,.08)}
+.task-card.is-failed{border-color:rgba(255,82,82,.55)}
+.task-state{display:inline-block;margin-top:3px;font-size:10px;letter-spacing:.12em;text-transform:uppercase}
+.task-state.is-running{color:#f3ba2f}.task-state.is-completed{color:#50e3a4}.task-state.is-failed{color:#ff6b6b}.task-state.is-pending{color:#c5d0dc}
+.task-card dl{display:grid;gap:6px;margin:0}
+.task-card dt{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:#c5d0dc}
+.task-card dd{margin:2px 0 0;font-size:13px;line-height:1.4;color:#f4f7fb}
+.task-agent{display:flex;flex-direction:column;align-items:flex-start;padding:6px 8px;border:1px solid color-mix(in srgb,var(--agent-accent) 50%,transparent);background:rgba(0,0,0,.25);color:#fff;font:inherit;cursor:pointer}
+.task-agent small{opacity:.75}
+.board-open,.scene-home{padding:6px 10px;border:1px solid rgba(243,186,47,.5);background:rgba(243,186,47,.14);color:#fff;font:inherit;font-size:11px;letter-spacing:.08em;text-transform:uppercase;cursor:pointer}
+.scene-home:disabled{opacity:.45;cursor:default}
+.board-task,.board-readout p{margin:0;font-size:13px;line-height:1.4;color:#e7eef7}
+.board-readout{padding:8px;border:1px solid rgba(255,255,255,.12);background:rgba(2,6,14,.92);display:flex;flex-direction:column;gap:4px}
+.board-readout strong{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#f3ba2f}
+.bay-actions{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.agent-hover-hint{position:absolute;left:8px;top:8px;z-index:6;max-width:72%;padding:8px 10px;background:#071018;border:1px solid #f3ba2f;color:#fff;pointer-events:none}
+.agent-hover-hint b,.agent-hover-hint span{display:block}.agent-hover-hint b{font-size:13px}.agent-hover-hint span{margin-top:3px;font-size:12px;line-height:1.35;color:#d5deea}
+.stage-captions{position:relative;z-index:2;flex:none;padding:10px 12px;background:rgba(2,6,14,.94);border:0;border-bottom:1px solid rgba(255,255,255,.16);color:#fff;pointer-events:none}
+.stage-captions-who{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px;margin-bottom:6px;font-size:12px;letter-spacing:.06em;text-transform:uppercase}
+.stage-captions-who em{font-style:normal;color:#f3ba2f}.stage-captions-who small{opacity:.75;text-transform:none;letter-spacing:0}
+.stage-captions p{margin:0;font-size:16px;line-height:1.4;color:#fff}
+.ops-tour{position:fixed;left:50%;top:84px;transform:translateX(-50%);z-index:20;width:min(420px,92vw);padding:16px;background:#071018;border:1px solid #f3ba2f;color:#fff;box-shadow:0 18px 60px rgba(0,0,0,.45);pointer-events:auto}
+.ops-tour-kicker{margin:0 0 6px;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#f3ba2f}
+.ops-tour h2{margin:0 0 8px;font-size:20px}.ops-tour p{margin:0 0 12px;font-size:14px;line-height:1.45;color:#e7eef7}
+.ops-tour-steps{margin:0 0 12px;padding-left:18px;font-size:13px;color:#d5deea}
+.ops-tour-steps .is-now{color:#f3ba2f;font-weight:700}.ops-tour-actions{display:flex;justify-content:space-between;gap:8px}
+.ops-tour-actions button{padding:10px 12px;border:1px solid rgba(255,255,255,.16);background:rgba(255,255,255,.05);color:#fff;font:inherit;cursor:pointer}
+
 @media(max-width:1200px){
   .cockpit-hud{grid-template-columns:1fr;grid-template-rows:auto auto auto auto auto;overflow:auto}
   .mission-strip{grid-template-columns:1fr 1fr;grid-auto-rows:auto}
   .mission-rail,.ops-rail,.mission-stage{grid-column:1;grid-row:auto}
-  .mission-stage{min-height:420px}
+  .mission-stage{min-height:48vh}
+  .cockpit-hud.is-mission-collapsed .mission-rail{display:none}
+}
+@media(min-width:1201px){
+  .cockpit-hud.is-mission-collapsed{grid-template-columns:0 minmax(0,1fr) minmax(240px,22%)}
+  .cockpit-hud.is-mission-collapsed .mission-rail{display:none}
 }
 @media(max-width:720px){
   .rail-commands{grid-template-columns:1fr}
@@ -208,6 +265,8 @@
   .bounty-dock{grid-template-columns:1fr}
   .bay-cards .bay-slot{flex-basis:88%}
   .stage-mission-banner{grid-template-columns:auto minmax(0,1fr) auto}.stage-mission-banner>div:nth-of-type(2){display:none}
+  .bay-actions{grid-template-columns:1fr}
+  .ops-tour{top:auto;bottom:12px}
 }
 @media(prefers-reduced-motion:reduce){
   .mission-stage .agent-avatar-stage,.stage-caption,.speak-badge.is-want,.strip-arrow{animation:none!important}

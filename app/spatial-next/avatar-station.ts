@@ -189,7 +189,10 @@ function chair(B: any, scene: any, mats: Mats, root: any, x = 0.58) {
 
 function hangBoard(B: any, scene: any, mats: Mats, root: any, live: ReturnType<typeof createBoardTexture>, size: [number, number] = [1.35, 0.72]) {
   box(B, scene, "ops-board-frame", { width: size[0] + 0.05, height: size[1] + 0.04, depth: 0.02 }, [0.05, 1.28, -0.7], mats.steel, root);
-  return box(B, scene, "ops-board", { width: size[0], height: size[1], depth: 0.03 }, [0.05, 1.28, -0.68], live.mat, root);
+  const board = box(B, scene, "ops-board", { width: size[0], height: size[1], depth: 0.03 }, [0.05, 1.28, -0.68], live.mat, root);
+  board.isPickable = true;
+  board.metadata = { kind: "blackboard" };
+  return board;
 }
 
 function buildCommander(B: any, scene: any, mats: Mats, root: any, live: ReturnType<typeof createBoardTexture>) {

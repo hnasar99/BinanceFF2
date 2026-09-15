@@ -42,7 +42,7 @@ function loadScript(src: string) {
     if (found) {
       const already =
         found.dataset.loaded === "true" ||
-        found.readyState === "complete" ||
+        (found as HTMLScriptElement & { readyState?: string }).readyState === "complete" ||
         (src === BABYLON_CORE && Boolean(window.BABYLON));
       if (already) return resolve();
       found.addEventListener("load", () => resolve(), { once: true });
@@ -122,6 +122,7 @@ function boneDirection(B: any, bone: any, mesh: any, axis: any) {
 }
 
 type AvatarVariant = "comms" | "stage" | "bay";
+export type CameraIntent = { mode: "home" | "agent" | "board"; nonce: number };
 
 function frameAvatar(B: any, camera: any, root: any, scene: any, variant: AvatarVariant) {
   if (!root) return;
@@ -287,7 +288,141 @@ function withOffsets(base: AxisPose, extras: AxisPose[]) {
   }));
 }
 
-function createBodyDriver(B: any, scene: any, root: any, idleAnimation: any) {
+type AuraLimbs = {
+  hips: Limb | null;
+  spine: Limb | null;
+  head: Limb | null;
+  leftShoulder: Limb | null;
+  rightShoulder: Limb | null;
+  leftArm: Limb | null;
+  rightArm: Limb | null;
+  leftFore: Limb | null;
+  rightFore: Limb | null;
+  leftHand: Limb | null;
+  rightHand: Limb | null;
+};
+
+const AURA_TEMPO: Record<string, number> = {
+  scout: 1980,
+  analyst: 2860,
+  commander: 2420,
+  strategist: 3180,
+  executor: 1760,
+  guardian: 2680,
+};
+
+function agentSeed(id: string) {
+  return id.split("").reduce((sum, char) => sum + char.charCodeAt(0), 0);
+}
+
+function keepSide(side: "L" | "R", hang: AxisPose, extra: AxisPose): AxisPose {
+  const ay = side === "L" ? Math.min(0.22, extra.ay) : Math.max(-0.22, extra.ay);
+  const az = side === "L" ? Math.max(-0.18, extra.az) : Math.min(0.18, extra.az);
+  return {
+    ax: hang.ax + extra.ax,
+    ay: hang.ay + ay,
+    az: hang.az + az,
+  };
+}
+
+function driveAura(
+  B: any,
+  opts: {
+    agentId: string;
+    elapsed: number;
+    mix: number;
+    variant: number;
+    hangL: AxisPose;
+    hangR: AxisPose;
+    limbs: AuraLimbs;
+    root: any;
+    rootHome: any;
+    rootYaw: number;
+  },
+) {
+  const { agentId, elapsed, mix, variant, hangL, hangR, limbs, root, rootHome, rootYaw } = opts;
+  const tempo = AURA_TEMPO[agentId] ?? 2400;
+  const phaseOffset = (agentSeed(agentId) % 9) * 0.11;
+  const cycle = ((elapsed + variant * 240) / tempo + phaseOffset) % 1;
+  const bounce = { scout: 0.07, analyst: 0.03, commander: 0.05, strategist: 0.04, executor: 0.08, guardian: 0.035 }[agentId] ?? 0.05;
+  const swayAmt = { scout: 0.09, analyst: 0.05, commander: 0.07, strategist: 0.11, executor: 0.06, guardian: 0.04 }[agentId] ?? 0.06;
+  const sway = Math.sin(cycle * Math.PI * 2) * swayAmt * mix;
+  const leadLeft = agentId === "scout" || agentId === "strategist" || agentId === "analyst";
+  if (root?.position && rootHome) {
+    root.position.y = rootHome.y + Math.abs(Math.sin(elapsed / (380 + variant * 40))) * bounce * mix;
+    root.position.x = rootHome.x + Math.sin(elapsed / 520) * 0.035 * mix * (leadLeft ? -1 : 1);
+  }
+  if (root?.rotation) root.rotation.y = rootYaw + Math.sin(elapsed / 740) * 0.07 * mix;
+  poseLimb(B, limbs.hips, 0, sway, 0);
+  poseLimb(B, limbs.spine, 0.04 * mix, sway * 0.4, 0);
+  poseLimb(B, limbs.head, 0.03 * mix, sway * 0.22, Math.sin(elapsed / 690) * 0.03 * mix);
+  poseLimb(B, limbs.leftShoulder, 0.06 * mix, 0, 0.16 + Math.max(0, sway) * 0.08);
+  poseLimb(B, limbs.rightShoulder, 0.06 * mix, 0, -(0.16 + Math.max(0, -sway) * 0.08));
+
+  const beat = cycle < 0.25 ? 0 : cycle < 0.5 ? 1 : cycle < 0.75 ? 2 : 3;
+  const local = (cycle % 0.25) * 4;
+  const ease = local * local * (3 - 2 * local);
+  const wave = Math.sin(ease * Math.PI);
+  const style = agentId === "guardian" ? "guard" : agentId === "executor" ? "pump" : agentId === "analyst" ? "think" : agentId === "commander" ? "present" : agentId === "strategist" ? "sway" : "wave";
+
+  let leftExtra: AxisPose = { ax: -0.12, ay: 0.08, az: 0.1 };
+  let rightExtra: AxisPose = { ax: -0.12, ay: -0.08, az: -0.1 };
+  let leftFore = { ax: -0.28, az: 0 };
+  let rightFore = { ax: -0.28, az: 0 };
+  let leftHand = 0.08;
+  let rightHand = 0.08;
+
+  if (style === "wave") {
+    const active = beat % 2 === 0;
+    leftExtra = active ? { ax: -0.55, ay: 0.12, az: 0.08 } : { ax: -0.18, ay: 0.04, az: 0.06 };
+    rightExtra = active ? { ax: -0.16, ay: -0.05, az: -0.06 } : { ax: -0.5, ay: -0.1, az: -0.08 };
+    leftFore = { ax: active ? -0.35 : -0.2, az: 0 };
+    rightFore = { ax: active ? -0.2 : -0.35, az: 0 };
+    leftHand = active ? 0.18 + wave * 0.12 : 0.06;
+    rightHand = active ? 0.06 : 0.18 + wave * 0.12;
+  } else if (style === "think") {
+    leftExtra = { ax: -0.22, ay: 0.1, az: 0.12 };
+    rightExtra = beat === 1 || beat === 2 ? { ax: -0.62, ay: -0.06, az: -0.04 } : { ax: -0.2, ay: -0.08, az: -0.08 };
+    leftFore = { ax: -0.18, az: 0.04 };
+    rightFore = { ax: beat === 1 || beat === 2 ? -0.7 : -0.22, az: 0 };
+    rightHand = beat === 1 || beat === 2 ? 0.22 : 0.08;
+  } else if (style === "present") {
+    const raiseRight = beat === 0 || beat === 1;
+    leftExtra = { ax: raiseRight ? -0.2 : -0.48, ay: 0.08, az: 0.1 };
+    rightExtra = { ax: raiseRight ? -0.52 : -0.18, ay: -0.08, az: -0.1 };
+    leftFore = { ax: raiseRight ? -0.18 : -0.4, az: 0 };
+    rightFore = { ax: raiseRight ? -0.4 : -0.18, az: 0 };
+  } else if (style === "sway") {
+    leftExtra = { ax: -0.28 + sway * 0.2, ay: 0.06, az: 0.08 };
+    rightExtra = { ax: -0.28 - sway * 0.2, ay: -0.06, az: -0.08 };
+    leftFore = { ax: -0.32, az: sway * 0.12 };
+    rightFore = { ax: -0.32, az: -sway * 0.12 };
+  } else if (style === "pump") {
+    const rightLead = beat === 0 || beat === 2;
+    leftExtra = { ax: rightLead ? -0.22 : -0.58, ay: 0.05, az: 0.08 };
+    rightExtra = { ax: rightLead ? -0.58 : -0.22, ay: -0.05, az: -0.08 };
+    leftFore = { ax: rightLead ? -0.2 : -0.48, az: 0 };
+    rightFore = { ax: rightLead ? -0.48 : -0.2, az: 0 };
+    leftHand = rightLead ? 0.08 : 0.2;
+    rightHand = rightLead ? 0.2 : 0.08;
+  } else {
+    leftExtra = { ax: -0.18, ay: 0.12, az: 0.16 };
+    rightExtra = { ax: -0.18, ay: -0.12, az: -0.16 };
+    leftFore = { ax: -0.22, az: 0.08 };
+    rightFore = { ax: -0.22, az: -0.08 };
+  }
+
+  const left = keepSide("L", hangL, leftExtra);
+  const right = keepSide("R", hangR, rightExtra);
+  poseLimb(B, limbs.leftArm, left.ax, left.ay, left.az);
+  poseLimb(B, limbs.rightArm, right.ax, right.ay, right.az);
+  poseLimb(B, limbs.leftFore, leftFore.ax * mix, 0, leftFore.az * mix);
+  poseLimb(B, limbs.rightFore, rightFore.ax * mix, 0, rightFore.az * mix);
+  poseLimb(B, limbs.leftHand, leftHand * mix, 0, 0);
+  poseLimb(B, limbs.rightHand, rightHand * mix, 0, 0);
+}
+
+function createBodyDriver(B: any, scene: any, root: any, idleAnimation: any, agentId = "commander") {
   const leftArm = captureLimb(B, scene, limbPattern("Left", "Arm"));
   const rightArm = captureLimb(B, scene, limbPattern("Right", "Arm"));
   const leftFore = captureLimb(B, scene, limbPattern("Left", "ForeArm"));
@@ -398,48 +533,20 @@ function createBodyDriver(B: any, scene: any, root: any, idleAnimation: any) {
   const observer = scene.onBeforeRenderObservable.add(() => {
     mixPoint += ((pose === "point" ? 1 : 0) - mixPoint) * 0.14;
     mixOperate += ((pose === "operate" ? 1 : 0) - mixOperate) * 0.12;
-    mixFarm += ((pose === "farmAura" ? 1 : 0) - mixFarm) * 0.1;
-    if (mixFarm > 0.12) {
-      const elapsed = Math.max(0, performance.now() - auraStartedAt);
-      const speed = [2380, 2700, 2180, 2520][auraVariant];
-      const cycle = (elapsed / speed) % 1;
-      const mirror = auraVariant % 2 === 0 ? 1 : -1;
-      const sway = Math.sin(cycle * Math.PI * 2) * (0.14 + auraVariant * 0.018) * mixFarm;
-      if (root?.position && rootHome) {
-        root.position.y = rootHome.y + Math.abs(Math.sin(elapsed / 310)) * 0.055 * mixFarm;
-        root.position.x = rootHome.x + Math.sin(elapsed / 460) * 0.08 * mixFarm * mirror;
-      }
-      if (root?.rotation) root.rotation.y = rootYaw + Math.sin(elapsed / 620) * 0.12 * mixFarm;
-      const phase = cycle < 1 / 3 ? 0 : cycle < 2 / 3 ? 1 : 2;
-      const local = cycle < 1 / 3 ? cycle * 3 : cycle < 2 / 3 ? (cycle - 1 / 3) * 3 : (cycle - 2 / 3) * 3;
-      poseLimb(B, hips, 0, sway * mirror, 0);
-      poseLimb(B, spine, (0.035 + auraVariant * 0.008) * mixFarm, sway * 0.55 * mirror, 0);
-      poseLimb(B, head, 0.04 * mixFarm, sway * 0.28 * mirror, Math.sin(elapsed / 710) * 0.035 * mixFarm);
-      poseLimb(B, leftShoulder, 0.1 * mixFarm, 0, 0.2 + sway * 0.12);
-      poseLimb(B, rightShoulder, 0.1 * mixFarm, 0, -(0.2 + sway * 0.12));
-      if ((phase + auraVariant) % 3 === 0) {
-        poseLimb(B, leftArm, hangL.ax - 0.85 * mixFarm, hangL.ay + 0.38 * mixFarm, hangL.az + 0.42 * mixFarm);
-        poseLimb(B, rightArm, hangR.ax + 0.18 * mixFarm, hangR.ay - 0.16 * mixFarm, hangR.az - 0.95 * mixFarm);
-        poseLimb(B, leftFore, -0.42 * mixFarm, 0, 0);
-        poseLimb(B, rightFore, -1.15 * mixFarm, 0, 0.28 * mixFarm);
-        poseLimb(B, leftHand, 0.15 * mixFarm, 0, 0);
-        poseLimb(B, rightHand, 0.1 * mixFarm, 0, 0);
-      } else if ((phase + auraVariant) % 3 === 1) {
-        const roll = local * Math.PI * 2;
-        poseLimb(B, leftArm, hangL.ax - 0.42 * mixFarm, hangL.ay + (0.55 + Math.sin(roll) * 0.35) * mixFarm, hangL.az + 0.22 * mixFarm);
-        poseLimb(B, rightArm, hangR.ax - 0.42 * mixFarm, hangR.ay - (0.55 + Math.sin(roll + Math.PI) * 0.35) * mixFarm, hangR.az - 0.22 * mixFarm);
-        poseLimb(B, leftFore, -0.82 * mixFarm, 0, Math.cos(roll) * 0.5 * mixFarm);
-        poseLimb(B, rightFore, -0.82 * mixFarm, 0, -Math.cos(roll) * 0.5 * mixFarm);
-        poseLimb(B, leftHand, Math.sin(roll) * 0.65 * mixFarm, 0, 0);
-        poseLimb(B, rightHand, Math.sin(roll + Math.PI) * 0.65 * mixFarm, 0, 0);
-      } else {
-        poseLimb(B, leftArm, hangL.ax - 0.72 * mixFarm, hangL.ay + 0.88 * mixFarm, hangL.az + 0.14 * mixFarm);
-        poseLimb(B, rightArm, hangR.ax + 0.12 * mixFarm, hangR.ay - 0.92 * mixFarm, hangR.az - 0.38 * mixFarm);
-        poseLimb(B, leftFore, -0.22 * mixFarm, 0, 0);
-        poseLimb(B, rightFore, -0.18 * mixFarm, 0, 0);
-        poseLimb(B, leftHand, 0.12 * mixFarm, 0, 0);
-        poseLimb(B, rightHand, 0.12 * mixFarm, 0, 0);
-      }
+    mixFarm += ((pose === "farmAura" ? 1 : 0) - mixFarm) * 0.08;
+    if (mixFarm > 0.08) {
+      driveAura(B, {
+        agentId,
+        elapsed: Math.max(0, performance.now() - auraStartedAt),
+        mix: mixFarm,
+        variant: auraVariant,
+        hangL,
+        hangR,
+        limbs: { hips, spine, head, leftShoulder, rightShoulder, leftArm, rightArm, leftFore, rightFore, leftHand, rightHand },
+        root,
+        rootHome,
+        rootYaw,
+      });
       return;
     }
     const reach = lerp(restL, operateL, mixOperate);
@@ -485,7 +592,7 @@ function createBodyDriver(B: any, scene: any, root: any, idleAnimation: any) {
     startAura(session: number) {
       if (session === auraSession) return;
       auraSession = session;
-      auraVariant = Math.abs(session) % 4;
+      auraVariant = (Math.abs(session) + agentSeed(agentId)) % 6;
       auraStartedAt = performance.now();
       idleAnimation?.pause?.();
       pose = "farmAura";
@@ -671,6 +778,8 @@ export function AgentAvatar({
   headsetLive = false,
   checks = [],
   auraSession = 0,
+  cameraIntent = { mode: "home", nonce: 0 },
+  onBoardPick,
 }: {
   agentId: string;
   speech?: SpeechCue | null;
@@ -681,6 +790,8 @@ export function AgentAvatar({
   headsetLive?: boolean;
   checks?: OpsCheck[];
   auraSession?: number;
+  cameraIntent?: CameraIntent;
+  onBoardPick?: () => void;
 }) {
   const { t, line, locale } = useSpatialI18n();
   const rig = agentRig(agentId);
@@ -690,8 +801,10 @@ export function AgentAvatar({
   const stationRef = useRef<ReturnType<typeof createAgentStation> | null>(null);
   const headsetRef = useRef<ReturnType<typeof createHeadset> | null>(null);
   const cameraRef = useRef<any>(null);
-  const cameraHomeRadiusRef = useRef(2.35);
-  const cameraTargetRadiusRef = useRef(2.35);
+  const cameraHomeRef = useRef({ alpha: Math.PI / 2, beta: 1.18, radius: 2.35, target: { x: 0, y: 1.18, z: 0 } });
+  const cameraGoalRef = useRef({ alpha: Math.PI / 2, beta: 1.18, radius: 2.35, target: { x: 0, y: 1.18, z: 0 }, active: false });
+  const onBoardPickRef = useRef(onBoardPick);
+  const swallowClickRef = useRef(false);
   const pendingRef = useRef<SpeechCue | null>(null);
   const gestureRef = useRef(gesture);
   gestureRef.current = gesture;
@@ -774,7 +887,7 @@ export function AgentAvatar({
         const importGlb = async (url: string) => {
           const slash = url.lastIndexOf("/");
           return withTimeout(
-            B.SceneLoader.ImportMeshAsync("", url.slice(0, slash + 1), url.slice(slash + 1), scene),
+            B.SceneLoader.ImportMeshAsync("", url.slice(0, slash + 1), url.slice(slash + 1), scene) as Promise<{ meshes?: any[]; animationGroups?: any[] }>,
             LOAD_MS,
             `Timed out loading ${url}`,
           );
@@ -789,11 +902,15 @@ export function AgentAvatar({
         const result = await importGlb(source);
         if (disposed) return;
         frameAvatar(B, camera, result.meshes?.[0], scene, variant);
-        cameraHomeRadiusRef.current = camera.radius;
-        cameraTargetRadiusRef.current = camera.radius;
+        cameraHomeRef.current = {
+          alpha: camera.alpha,
+          beta: camera.beta,
+          radius: camera.radius,
+          target: { x: camera.target.x, y: camera.target.y, z: camera.target.z },
+        };
         tintOutfit(B, geometryMeshes(result.meshes?.[0], null), rig.accent);
         const idleAnimation = playIdle(result);
-        armsRef.current = createBodyDriver(B, scene, result.meshes?.[0], idleAnimation);
+        armsRef.current = createBodyDriver(B, scene, result.meshes?.[0], idleAnimation, rig.id);
         armsRef.current.setPose(gestureRef.current);
         headsetRef.current = createHeadset(B, scene, rig.accent);
         headsetRef.current?.setWorn(headsetOnRef.current);
@@ -806,9 +923,36 @@ export function AgentAvatar({
           lipsRef.current?.speak(pendingRef.current.text, pendingRef.current.durationMs);
         }
 
+        let pointerDown: { x: number; y: number } | null = null;
+        scene.onPointerObservable.add((info: { type: number }) => {
+          if (info.type === B.PointerEventTypes.POINTERDOWN) {
+            pointerDown = { x: scene.pointerX, y: scene.pointerY };
+            return;
+          }
+          if (info.type !== B.PointerEventTypes.POINTERUP || !pointerDown) return;
+          const dx = scene.pointerX - pointerDown.x;
+          const dy = scene.pointerY - pointerDown.y;
+          pointerDown = null;
+          if (dx * dx + dy * dy > 36) return;
+          const pick = scene.pick(scene.pointerX, scene.pointerY);
+          if (pick?.pickedMesh?.metadata?.kind === "blackboard") {
+            swallowClickRef.current = true;
+            onBoardPickRef.current?.();
+          }
+        });
+
         engine.runRenderLoop(() => {
-          if (cameraRef.current) {
-            cameraRef.current.radius += (cameraTargetRadiusRef.current - cameraRef.current.radius) * 0.075;
+          const cam = cameraRef.current;
+          const goal = cameraGoalRef.current;
+          if (cam && goal.active) {
+            cam.alpha += (goal.alpha - cam.alpha) * 0.1;
+            cam.beta += (goal.beta - cam.beta) * 0.1;
+            cam.radius += (goal.radius - cam.radius) * 0.1;
+            cam.target.x += (goal.target.x - cam.target.x) * 0.1;
+            cam.target.y += (goal.target.y - cam.target.y) * 0.1;
+            cam.target.z += (goal.target.z - cam.target.z) * 0.1;
+            const close = Math.abs(cam.radius - goal.radius) < 0.02 && Math.abs(cam.alpha - goal.alpha) < 0.01;
+            if (close) goal.active = false;
           }
           scene?.render();
         });
@@ -845,6 +989,10 @@ export function AgentAvatar({
   }, [rig.accent, rig.id, rig.name, rig.sourceLabel, rig.sources, variant]);
 
   useEffect(() => {
+    onBoardPickRef.current = onBoardPick;
+  }, [onBoardPick]);
+
+  useEffect(() => {
     armsRef.current?.setPose(gesture);
   }, [gesture]);
 
@@ -859,10 +1007,34 @@ export function AgentAvatar({
   useEffect(() => {
     headsetRef.current?.setLive(headsetLive || speaking);
     stationRef.current?.setLive(headsetLive || speaking);
-    cameraTargetRadiusRef.current = speaking
-      ? cameraHomeRadiusRef.current * 0.78
-      : cameraHomeRadiusRef.current;
   }, [headsetLive, speaking]);
+
+  useEffect(() => {
+    const camera = cameraRef.current;
+    if (!camera) return;
+    const home = cameraHomeRef.current;
+    if (cameraIntent.mode === "home") {
+      cameraGoalRef.current = { ...home, target: { ...home.target }, active: true };
+      return;
+    }
+    if (cameraIntent.mode === "board") {
+      cameraGoalRef.current = {
+        alpha: home.alpha + 0.18,
+        beta: 1.08,
+        radius: Math.max(1.55, home.radius * 0.72),
+        target: { x: 0.05, y: 1.28, z: -0.42 },
+        active: true,
+      };
+      return;
+    }
+    cameraGoalRef.current = {
+      alpha: home.alpha,
+      beta: Math.max(0.86, home.beta - 0.12),
+      radius: Math.max(1.2, home.radius * 0.58),
+      target: { x: home.target.x, y: home.target.y + 0.16, z: home.target.z },
+      active: true,
+    };
+  }, [cameraIntent.mode, cameraIntent.nonce]);
 
   useEffect(() => {
     const station = stationRef.current;
@@ -886,7 +1058,15 @@ export function AgentAvatar({
 
   return (
     <div className={`agent-avatar-stage is-${variant}`} style={{ ["--agent-accent" as string]: rig.accent }}>
-      <canvas ref={canvasRef} aria-label={`${rig.name}, ${rig.role}`} />
+      <canvas
+        ref={canvasRef}
+        aria-label={`${rig.name}, ${rig.role}`}
+        onClick={(event) => {
+          if (!swallowClickRef.current) return;
+          swallowClickRef.current = false;
+          event.stopPropagation();
+        }}
+      />
       {state.startsWith("Loading") || /missing|unavailable|no visemes/i.test(state) ? (
         <div className="agent-avatar-status"><i /> {state.startsWith("Loading") ? t("Loading 3D double…") : /missing/i.test(state) ? t("3D double missing") : /unavailable/i.test(state) ? t("Avatar runtime unavailable") : state}</div>
       ) : null}

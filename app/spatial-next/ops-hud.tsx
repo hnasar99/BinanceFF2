@@ -1,25 +1,17 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState, useSyncExternalStore } from "react";
+import Link from "next/link";
 import { OPS_PHASES, rosterAgent, type OpsWorld } from "@/lib/ops-sim";
-import { languages, translate } from "../spatial/i18n";
 import { useSpatialI18n } from "../spatial/i18n-context";
 import { ActivityScope } from "./activity-scope";
 import { BountyDock } from "./bounty-dock";
 import { LangSwitch } from "./lang-switch";
-import { SquadStage } from "./squad-stage";
+import { EXAMPLE_MISSION } from "./mission-model";
+import { MissionPanel } from "./mission-panel";
+import { SquadStage, type SquadStageHandle } from "./squad-stage";
+import { StageCaptions } from "./stage-captions";
 import { useOps } from "./ops-context";
-
-const PHASE_NOW = [
-  "The squad is locking the goal and the mandate you just deployed.",
-  "Scouts are gathering live BNB liquidity and protocol state.",
-  "Strategist is simulating routes. Execute stays blocked.",
-  "Guardian is checking budget, selectors and the risk envelope.",
-  "Analyst is sealing evidence the oracle can reproduce.",
-  "Settlement is ready. Only your wallet can move value.",
-];
-
-const DEFAULT_INTENT = "Map the safest BNB liquidity routes and seal evidence";
 
 function elapsed(startedAt: number, now: number) {
   const seconds = Math.max(0, Math.floor((now - startedAt) / 1000));
@@ -46,17 +38,20 @@ function cautionKey(mode: string) {
   return "STANDBY";
 }
 
-function phaseNoteKey(index: number, phase: number) {
-  if (index < phase) return "Verified";
-  if (index === phase) return "Happening now";
-  return "Comes next";
+function subscribeDesktop(onChange: () => void) {
+  const media = window.matchMedia("(max-width: 1200px)");
+  media.addEventListener("change", onChange);
+  return () => media.removeEventListener("change", onChange);
 }
 
 export function OpsHud() {
   const ops = useOps();
-  const { locale, t, line } = useSpatialI18n();
-  const { world, audibleId, settling, settleError, select, toggle, deploy, pause, resume, scanRadar, decide, settle, report, promoteVoice, agentWantsVoice } = ops;
-  const [intent, setIntent] = useState(DEFAULT_INTENT);
+  const { t, line } = useSpatialI18n();
+  const { world, audibleId, settling, settleError, deploy, pause, resume, scanRadar, decide, settle, report, promoteVoice, agentWantsVoice } = ops;
+  const [missionOpenOverride, setMissionOpenOverride] = useState<boolean | null>(null);
+  const desktop = useSyncExternalStore(subscribeDesktop, () => !window.matchMedia("(max-width: 1200px)").matches, () => true);
+  const missionOpen = missionOpenOverride ?? desktop;
+  const [stageApi, setStageApi] = useState<SquadStageHandle | null>(null);
   const selected = useMemo(() => rosterAgent(world.selectedId), [world.selectedId]);
   const mission = world.mission;
   const caution = cautionMode(world);
@@ -64,12 +59,7 @@ export function OpsHud() {
   const clock = mission ? elapsed(mission.startedAt, world.now) : "00:00";
   const stageLive = Boolean(audibleId);
 
-  useEffect(() => {
-    setIntent((current) => {
-      const isDefault = current === DEFAULT_INTENT || languages.some((language) => translate(language.id, DEFAULT_INTENT) === current);
-      return isDefault ? t(DEFAULT_INTENT) : current;
-    });
-  }, [t]);
+  const onReady = useCallback((api: SquadStageHandle) => setStageApi(api), []);
 
   const stick = (() => {
     if (world.gate?.kind === "settle") {
@@ -101,7 +91,7 @@ export function OpsHud() {
         mode: "deploy" as const,
         primary: mission ? t("New operation") : t("Deploy mission"),
         primaryHint: "▶",
-        onPrimary: () => deploy(intent),
+        onPrimary: () => deploy(EXAMPLE_MISSION.title, { brief: EXAMPLE_MISSION.brief, criteria: EXAMPLE_MISSION.criteria, reward: EXAMPLE_MISSION.reward }),
         secondary: world.radar.scanning ? t("Sweeping…") : t("Scan radar"),
         secondaryHint: "R",
         onSecondary: scanRadar,
@@ -134,14 +124,9 @@ export function OpsHud() {
 
   const title = mission ? line(mission.title) : t("No mission deployed");
   const phaseTitle = phase >= 0 ? t(OPS_PHASES[phase]) : t("Awaiting deploy");
-  const objective = world.gate
-    ? line(world.gate.prompt)
-    : mission
-      ? t(PHASE_NOW[Math.max(0, phase)])
-      : t("Write an intent, deploy the squad, then follow the mission as each agent reports on stage.");
 
   return (
-    <div className={`cockpit-hud is-${caution}`}>
+    <div className={`cockpit-hud is-${caution}${missionOpen ? "" : " is-mission-collapsed"}`}>
       <header className="mission-strip">
         <div className="ms-brand">
           <span>BinanceFF2</span>
@@ -169,92 +154,25 @@ export function OpsHud() {
           <strong>{clock}</strong>
         </div>
         <div className="ms-tools">
+          <button
+            type="button"
+            className="ms-mission-toggle"
+            aria-expanded={missionOpen}
+            onClick={() => setMissionOpenOverride((open) => !(open ?? desktop))}
+          >
+            {missionOpen ? t("Hide mission") : t("Show mission")}
+          </button>
           <LangSwitch />
-          <a href="/" className="ms-exit">{t("Exit")}</a>
+          <Link href="/" className="ms-exit">{t("Exit")}</Link>
         </div>
       </header>
 
-      <aside className="mission-rail">
-        <div className="rail-head">
-          <span>{t("What happens next")}</span>
-          <small>{phase >= 0 ? `${phase + 1}/${OPS_PHASES.length}` : "0/6"}</small>
-        </div>
-
-        {!mission ? (
-          <div className="mission-launcher">
-            <strong>{t("Launch a mission")}</strong>
-            <label className="rail-intent">
-              {t("Mission intent")}
-              <input value={intent} onChange={(event) => setIntent(event.target.value)} />
-            </label>
-            <button type="button" className="mission-launch-button" onClick={() => deploy(intent)}>
-              <span aria-hidden="true">▶</span>
-              <span><b>{t("Deploy mission")}</b><small>{t("Brief and activate the squad")}</small></span>
-            </button>
-          </div>
-        ) : (
-          <div className="active-mission-card">
-            <span>{world.running ? t("Mission executing") : t("Mission on hold")}</span>
-            <strong>{title}</strong>
-            <small>{t("Now: {phase}", { phase: phaseTitle })}</small>
-          </div>
-        )}
-
-        <ol className="phase-list">
-          {OPS_PHASES.map((item, index) => (
-            <li key={item} className={index < phase ? "is-done" : index === phase ? "is-now" : ""}>
-              <em>{index < phase ? "✓" : index + 1}</em>
-              <div>
-                <b>{t(item)}</b>
-                <small>{t(phaseNoteKey(index, phase))}</small>
-              </div>
-            </li>
-          ))}
-        </ol>
-
-        <p className="rail-objective">{objective}</p>
-
-        <dl className="rail-stats">
-          <div>
-            <dt>{t("Mandate")}</dt>
-            <dd>{world.compliance.mandate === "NONE" ? t("Not armed") : t(world.compliance.mandate)}</dd>
-          </div>
-          <div>
-            <dt>{t("Evidence seals")}</dt>
-            <dd>{t("{n} sealed", { n: world.compliance.evidence })}</dd>
-          </div>
-          <div>
-            <dt>{t("Budget used")}</dt>
-            <dd>{world.compliance.budgetUsed} / {world.compliance.budgetMax}</dd>
-          </div>
-          <div>
-            <dt>{t("SLA hold")}</dt>
-            <dd>{world.compliance.slaHold}%</dd>
-          </div>
-        </dl>
-        {world.compliance.disputes ? <p className="rail-alert">{t("Dispute open — funds stay locked")}</p> : null}
-        {world.compliance.policyKills ? <p className="rail-alert is-soft">{t(world.compliance.policyKills === 1 ? "{n} route killed by policy" : "{n} routes killed by policy", { n: world.compliance.policyKills })}</p> : null}
-
-        <div className="rail-commands">
-          {mission ? (
-            <button type="button" className="cmd-primary" disabled={stick.disabled} onClick={stick.onPrimary}>
-              <kbd>{stick.primaryHint}</kbd>
-              {stick.primary}
-            </button>
-          ) : null}
-          <button type="button" className={stick.mode === "gate" ? "cmd-kill" : "cmd-scan"} disabled={stick.disabled && stick.mode !== "gate"} onClick={stick.onSecondary}>
-            <kbd>{stick.secondaryHint}</kbd>
-            {stick.secondary}
-          </button>
-          <button type="button" onClick={() => report(selected.id)}>
-            {t("Ask {name} to report", { name: selected.name })}
-          </button>
-          <button type="button" onClick={() => toggle(selected.id)}>
-            {world.assigned.includes(selected.id) ? t("Stand down {name}", { name: selected.name }) : t("Assign {name}", { name: selected.name })}
-          </button>
-        </div>
-        <p className="rail-hint">{t("You remain in control. Agents may read, test and recommend. They cannot move money without you.")}</p>
-      </aside>
+      <MissionPanel
+        stick={stick}
+        tourStep={null}
+        onOpenAgent={(id) => stageApi?.focusAgent(id)}
+        onOpenBoard={(id) => stageApi?.focusBoard(id)}
+      />
 
       <section className={`mission-stage${stageLive ? " is-live" : ""}${world.gate ? " is-gate" : ""}`} style={{ ["--agent-accent" as string]: selected.accent }}>
         <div className="stage-mission-banner" aria-live="polite">
@@ -269,7 +187,8 @@ export function OpsHud() {
           </div>
           <b>{world.compliance.completionPct}%</b>
         </div>
-        <SquadStage />
+        <StageCaptions />
+        <SquadStage onReady={onReady} />
         {world.gate ? (
           <div className="stage-gate">
             <small>{line(world.gate.label)}</small>
@@ -298,7 +217,7 @@ export function OpsHud() {
                 className={`log-row${world.selectedId === event.agentId ? " is-lock" : ""}`}
                 style={{ ["--agent-accent" as string]: agent.accent }}
                 onClick={() => {
-                  select(event.agentId);
+                  stageApi?.focusAgent(event.agentId);
                   if (agentWantsVoice(event.agentId)) promoteVoice(event.agentId);
                   else report(event.agentId);
                 }}

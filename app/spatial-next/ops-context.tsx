@@ -18,6 +18,7 @@ import {
   setRunning,
   tickWorld,
   toggleAssign,
+  type MissionDraft,
   type OpsWorld,
 } from "@/lib/ops-sim";
 import {
@@ -47,7 +48,7 @@ type OpsContextValue = {
   settleError: string;
   select: (id: string, opts?: { takeFloor?: boolean }) => void;
   toggle: (id: string) => void;
-  deploy: (title: string) => void;
+  deploy: (title: string, extras?: MissionDraft) => void;
   pause: () => void;
   resume: () => void;
   pulse: () => void;
@@ -255,9 +256,9 @@ export function OpsProvider({ children }: { children: ReactNode }) {
       }
     },
     toggle: (id) => setWorld((current) => toggleAssign(current, id)),
-    deploy: (title) => {
+    deploy: (title, extras) => {
       setSettleError("");
-      setWorld((current) => deployMission(current, title, Date.now()));
+      setWorld((current) => deployMission(current, title, Date.now(), extras));
       enqueueLine("commander", DEPLOY_LINE);
     },
     pause: () => setWorld((current) => setRunning(current, false)),
@@ -330,7 +331,10 @@ export function OpsProvider({ children }: { children: ReactNode }) {
         return next;
       });
     },
-    unlock: () => setWorld((current) => clearLock(current)),
+    unlock: () => {
+      setWorld((current) => clearLock(current));
+      window.dispatchEvent(new CustomEvent("binanceff-scene-home"));
+    },
     promoteVoice,
     holdVoice,
     releaseVoice,
@@ -353,8 +357,9 @@ export function OpsProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
-      const tag = (event.target as HTMLElement | null)?.tagName;
-      if (tag === "INPUT" || tag === "TEXTAREA") return;
+      const target = event.target as HTMLElement | null;
+      const tag = target?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || target?.isContentEditable) return;
       const api = apiRef.current;
       const current = worldRef.current;
       if (event.code === "Space") {

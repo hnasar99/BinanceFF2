@@ -72,10 +72,18 @@ export type OpsEvent = {
   sector: number;
 };
 
+export type MissionDraft = {
+  brief?: string;
+  criteria?: string;
+  reward?: string;
+};
+
 export type OpsMission = {
   id: string;
   title: string;
   reward: string;
+  brief: string;
+  criteria: string;
   progress: number;
   phaseIndex: number;
   status: OpsMissionStatus;
@@ -162,8 +170,8 @@ export function focusNode(world: OpsWorld, nodeName: string): OpsWorld {
 export function toggleAssign(world: OpsWorld, id: string): OpsWorld {
   return toggleAssignRaw(world, id) as OpsWorld;
 }
-export function deployMission(world: OpsWorld, title?: string, now?: number): OpsWorld {
-  return deployMissionRaw(world, title, now) as OpsWorld;
+export function deployMission(world: OpsWorld, title?: string, now?: number, extras?: MissionDraft): OpsWorld {
+  return deployMissionRaw(world, title, now, extras) as OpsWorld;
 }
 export function setRunning(world: OpsWorld, running: boolean): OpsWorld {
   return setRunningRaw(world, running) as OpsWorld;
