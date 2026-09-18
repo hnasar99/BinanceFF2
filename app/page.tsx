@@ -46,6 +46,7 @@ import {
 } from "@/components/ui/dialog";
 import { MissionConsole, type ConsoleMission } from "./mission-console";
 import { OpportunityRadar } from "./opportunity-radar";
+import { SolanaTradingLab } from "./solana-trading-lab";
 
 type Agent = {
   id: number;
@@ -215,6 +216,7 @@ const nav = [
   ["command", LayoutDashboard, "Command"],
   ["console", Terminal, "Console"],
   ["radar", Radar, "Radar"],
+  ["solana-lab", Terminal, "Solana Lab"],
   ["agents", Bot, "Agents"],
   ["bounties", Target, "Bounties"],
   ["teams", Users, "Teams"],
@@ -1466,6 +1468,7 @@ export default function Home() {
           />
         )}
         {active === "radar" && <OpportunityRadar />}
+        {active === "solana-lab" && <SolanaTradingLab />}
         {active === "agents" && <AgentsView navigate={setActive} />}
         {active === "bounties" && <BountiesView openConsole={openConsole} />}
         {active === "teams" && <TeamsView openConsole={openConsole} />}
