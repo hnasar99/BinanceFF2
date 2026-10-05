@@ -13,31 +13,11 @@ uuid = { version = "1", features = ["v4", "serde"] }
 openhuman-embed = { git = "https://github.com/tinyhumansai/openhuman", rev = "cbde5069dec828c117131ee75f9d2bbeb5bda02b", default-features = false, features = ["inference"] }
 openhuman-core = { package = "openhuman", git = "https://github.com/tinyhumansai/openhuman", rev = "cbde5069dec828c117131ee75f9d2bbeb5bda02b", default-features = false, features = ["inference"] }
 
-# Cargo does not inherit patches from dependency workspaces. Mirror OpenHuman's
-# patches here, using its pinned git tree so all tools share the same types.
+# Dependency workspace patches are not inherited by this bridge.
+# Unify tinymcp/tokenjuice's git tinytools with the exact vendored packages
+# already used by OpenHuman's harness. Other upstream workspace patches
+# are intentionally omitted: their path packages are not all discoverable
+# through this git source.
 [patch."https://github.com/tinyhumansai/tinytools"]
-# tinymcp's `tools` feature names tinytools by git rev so it can be built on its
-# own. Redirect it to the copy tinyagents vendors — the one the harness and
-# every host tool link — so there is exactly one `tinytools` package and one
-# `Tool` trait. Without this, MCP tools would not satisfy the harness's trait.
 tinytools = { git = "https://github.com/tinyhumansai/openhuman", rev = "cbde5069dec828c117131ee75f9d2bbeb5bda02b" }
 tinytools-agent = { git = "https://github.com/tinyhumansai/openhuman", rev = "cbde5069dec828c117131ee75f9d2bbeb5bda02b" }
-
-[patch."https://github.com/tinyhumansai/tinyinference"]
-tinyinference-core = { git = "https://github.com/tinyhumansai/openhuman", rev = "cbde5069dec828c117131ee75f9d2bbeb5bda02b" }
-tinyinference-embeddings = { git = "https://github.com/tinyhumansai/openhuman", rev = "cbde5069dec828c117131ee75f9d2bbeb5bda02b" }
-tinyinference-llm = { git = "https://github.com/tinyhumansai/openhuman", rev = "cbde5069dec828c117131ee75f9d2bbeb5bda02b" }
-tinyinference-local = { git = "https://github.com/tinyhumansai/openhuman", rev = "cbde5069dec828c117131ee75f9d2bbeb5bda02b" }
-tinyinference-providers = { git = "https://github.com/tinyhumansai/openhuman", rev = "cbde5069dec828c117131ee75f9d2bbeb5bda02b" }
-tinyinference-voice = { git = "https://github.com/tinyhumansai/openhuman", rev = "cbde5069dec828c117131ee75f9d2bbeb5bda02b" }
-
-[patch.crates-io]
-tinyinference-core = { git = "https://github.com/tinyhumansai/openhuman", rev = "cbde5069dec828c117131ee75f9d2bbeb5bda02b" }
-tinyinference-embeddings = { git = "https://github.com/tinyhumansai/openhuman", rev = "cbde5069dec828c117131ee75f9d2bbeb5bda02b" }
-tinyinference-llm = { git = "https://github.com/tinyhumansai/openhuman", rev = "cbde5069dec828c117131ee75f9d2bbeb5bda02b" }
-tinyinference-local = { git = "https://github.com/tinyhumansai/openhuman", rev = "cbde5069dec828c117131ee75f9d2bbeb5bda02b" }
-tinyinference-providers = { git = "https://github.com/tinyhumansai/openhuman", rev = "cbde5069dec828c117131ee75f9d2bbeb5bda02b" }
-tinyinference-voice = { git = "https://github.com/tinyhumansai/openhuman", rev = "cbde5069dec828c117131ee75f9d2bbeb5bda02b" }
-tinyflows = { git = "https://github.com/tinyhumansai/openhuman", rev = "cbde5069dec828c117131ee75f9d2bbeb5bda02b" }
-tinychannels = { git = "https://github.com/tinyhumansai/openhuman", rev = "cbde5069dec828c117131ee75f9d2bbeb5bda02b" }
-
