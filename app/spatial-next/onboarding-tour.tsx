@@ -1,6 +1,7 @@
 "use client";
 
 import { useSyncExternalStore, useState } from "react";
+import { useAgentRuntime } from "./runtime-context";
 import { useSpatialI18n } from "../spatial/i18n-context";
 
 const TOUR_KEY = "binanceff2-spatial-tour-v1";
@@ -31,6 +32,7 @@ function readTourStep() {
 
 export function OnboardingTour() {
   const { t } = useSpatialI18n();
+  const runtime = useAgentRuntime();
   const stored = useSyncExternalStore(subscribeTour, readTourStep, () => 0);
   const [override, setOverride] = useState<number | null | "stored">("stored");
   const step = override === "stored" ? stored : override;
@@ -40,7 +42,7 @@ export function OnboardingTour() {
     setOverride(null);
   };
 
-  if (step === null) return null;
+  if (step === null || runtime.mode === "runtime") return null;
   const current = STEPS[step];
   const last = step === STEPS.length - 1;
 

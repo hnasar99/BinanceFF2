@@ -1,0 +1,23 @@
+[package]
+name = "binanceff-openhuman-bridge"
+version = "0.1.0"
+edition = "2024"
+license = "GPL-3.0-only"
+
+[dependencies]
+axum = "0.8"
+tokio = { version = "1", features = ["full"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+uuid = { version = "1", features = ["v4", "serde"] }
+openhuman-embed = { git = "https://github.com/tinyhumansai/openhuman", rev = "cbde5069dec828c117131ee75f9d2bbeb5bda02b", default-features = false, features = ["inference"] }
+openhuman-core = { package = "openhuman", git = "https://github.com/tinyhumansai/openhuman", rev = "cbde5069dec828c117131ee75f9d2bbeb5bda02b", default-features = false, features = ["inference"] }
+
+# Dependency workspace patches are not inherited by this bridge.
+# Unify tinymcp/tokenjuice's git tinytools with the exact vendored packages
+# already used by OpenHuman's harness. Other upstream workspace patches
+# are intentionally omitted: their path packages are not all discoverable
+# through this git source.
+[patch."https://github.com/tinyhumansai/tinytools"]
+tinytools = { git = "https://github.com/tinyhumansai/openhuman", rev = "cbde5069dec828c117131ee75f9d2bbeb5bda02b" }
+tinytools-agent = { git = "https://github.com/tinyhumansai/openhuman", rev = "cbde5069dec828c117131ee75f9d2bbeb5bda02b" }

@@ -234,7 +234,6 @@ export function SquadStage({ onReady }: { onReady?: (api: SquadStageHandle) => v
   const { world, audibleId, select, promoteVoice } = useOps();
   const { t } = useSpatialI18n();
   const [view, setView] = useState<StageView>("cards");
-  const [autoFocus, setAutoFocus] = useState(false);
   const [pairLayout, setPairLayout] = useState<PairLayout>(() => readPairLayout());
   const [visible, setVisible] = useState<string[]>(() => OPS_AGENTS.slice(0, LIVE_CAP).map((agent) => agent.id));
   const stripRef = useRef<HTMLDivElement | null>(null);
@@ -337,13 +336,6 @@ export function SquadStage({ onReady }: { onReady?: (api: SquadStageHandle) => v
       observer?.disconnect();
     };
   }, [view, squad.length, pairLayout]);
-
-  useEffect(() => {
-    if (!autoFocus || !audibleId || !squad.includes(audibleId)) return;
-    const root = stripRef.current;
-    const node = root?.querySelector<HTMLElement>(`[data-agent="${audibleId}"]`);
-    node?.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
-  }, [audibleId, autoFocus, squad]);
 
   const scrollStrip = (dir: -1 | 1) => {
     const root = stripRef.current;
@@ -527,14 +519,6 @@ export function SquadStage({ onReady }: { onReady?: (api: SquadStageHandle) => v
           disabled={view !== "single" && !sceneLocked}
         >
           {t("Back to the scene")}
-        </button>
-        <button
-          type="button"
-          className={`speaker-follow${autoFocus ? " is-on" : ""}`}
-          aria-pressed={autoFocus}
-          onClick={() => setAutoFocus((current) => !current)}
-        >
-          <span aria-hidden="true">◉</span> {t("Follow speaker")}
         </button>
         <button
           type="button"
