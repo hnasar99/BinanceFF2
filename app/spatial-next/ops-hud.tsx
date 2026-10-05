@@ -13,6 +13,9 @@ import { SquadStage, type SquadStageHandle } from "./squad-stage";
 import { StageCaptions } from "./stage-captions";
 import { useOps } from "./ops-context";
 
+import { OperationsMap } from "./operations-map";
+import { useAgentRuntime } from "./runtime-context";
+
 function elapsed(startedAt: number, now: number) {
   const seconds = Math.max(0, Math.floor((now - startedAt) / 1000));
   return `${String(Math.floor(seconds / 60)).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`;
@@ -46,6 +49,7 @@ function subscribeDesktop(onChange: () => void) {
 
 export function OpsHud() {
   const ops = useOps();
+  const runtime = useAgentRuntime();
   const { t, line } = useSpatialI18n();
   const { world, audibleId, settling, settleError, deploy, pause, resume, scanRadar, decide, settle, report, promoteVoice, agentWantsVoice } = ops;
   const [missionOpenOverride, setMissionOpenOverride] = useState<boolean | null>(null);
@@ -62,6 +66,7 @@ export function OpsHud() {
   const onReady = useCallback((api: SquadStageHandle) => setStageApi(api), []);
 
   const stick = (() => {
+    if (runtime.mode === "runtime") return { mode: "deploy" as const, primary: t("Deploy mission"), primaryHint: "▶", onPrimary: () => runtime.setView("mission"), secondary: t("Scan radar"), secondaryHint: "R", onSecondary: scanRadar, disabled: runtime.busy };
     if (world.gate?.kind === "settle") {
       return {
         mode: "gate" as const,
@@ -131,6 +136,7 @@ export function OpsHud() {
         <div className="ms-brand">
           <span>BinanceFF2</span>
           <strong>{t("Live Mission Room")}</strong>
+          <small className="mission-data-note">{runtime.mode === "demo" ? t("Dialogue: demo · Radar: BSC RPC when scanned") : "OpenHuman · analysis only · no spend"}</small>
         </div>
         <div className="ms-title">
           <span>{t("Current mission")}</span>
@@ -140,8 +146,8 @@ export function OpsHud() {
           <span>{phase >= 0 ? t("Phase {n} of {total}", { n: phase + 1, total: OPS_PHASES.length }) : t("Phase —")}</span>
           <strong>{phaseTitle}</strong>
         </div>
-        <div className="ms-progress" aria-label={`${t("Progress")} ${world.compliance.completionPct}%`}>
-          <span>{t("Progress")}</span>
+        <div className="ms-progress" aria-label={`${runtime.mode === "demo" ? t("Demo progress") : "Agent turns"} ${world.compliance.completionPct}%`}>
+          <span>{runtime.mode === "demo" ? t("Demo progress") : "Agent turns"}</span>
           <b>{world.compliance.completionPct}%</b>
           <i><em style={{ width: `${world.compliance.completionPct}%` }} /></i>
         </div>
@@ -166,6 +172,8 @@ export function OpsHud() {
           <Link href="/" className="ms-exit">{t("Exit")}</Link>
         </div>
       </header>
+
+      <OperationsMap />
 
       <MissionPanel
         stick={stick}

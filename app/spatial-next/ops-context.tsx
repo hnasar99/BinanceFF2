@@ -37,6 +37,9 @@ import { useSpatialI18n } from "../spatial/i18n-context";
 import { pauseAgentSpeech, playAgentSpeech, resumeAgentSpeech, stopAgentSpeech, stopHoverSpeech, type VoicePlayMeta } from "./agent-speaker";
 import type { SpeechCue } from "./agent-avatar";
 
+import { useAgentRuntime } from "./runtime-context";
+import { projectRuntime } from "@/lib/runtime-world";
+
 type OpsContextValue = {
   world: OpsWorld;
   speech: SpeechCue | null;
@@ -73,7 +76,8 @@ export function useOps() {
 
 export function OpsProvider({ children }: { children: ReactNode }) {
   const { locale, line } = useSpatialI18n();
-  const [world, setWorld] = useState<OpsWorld>(() => createOpsWorld(Date.now()));
+  const runtime = useAgentRuntime();
+  const [world, setWorld] = useState<OpsWorld>(() => projectRuntime(createOpsWorld(Date.now()), null));
   const [queue, setQueue] = useState<VoiceQueue>(() => createVoiceQueue());
   const [speech, setSpeech] = useState<SpeechCue | null>(null);
   const [voiceMeta, setVoiceMeta] = useState<VoicePlayMeta | null>(null);
@@ -92,7 +96,8 @@ export function OpsProvider({ children }: { children: ReactNode }) {
     resume: () => {},
     scanRadar: () => {},
     decide: (_d: "approve" | "kill") => {},
-    settle: () => {},
+    settle: () => {
+      if (runtime.mode !== "demo") return;},
     report: (_id?: string) => {},
     select: (_id: string) => {},
     unlock: () => {},
@@ -196,11 +201,22 @@ export function OpsProvider({ children }: { children: ReactNode }) {
   }, [audibleKey, locale, line]);
 
   useEffect(() => {
+    setWorld((current) => runtime.mode === "runtime" ? projectRuntime(current, runtime.snapshot) : createOpsWorld(Date.now()));
+    stopAgentSpeech();
+    setQueue(createVoiceQueue());
+  }, [runtime.mode]);
+
+  useEffect(() => {
+    if (runtime.mode === "runtime") setWorld((current) => projectRuntime(current, runtime.snapshot));
+  }, [runtime.snapshot, runtime.mode]);
+
+  useEffect(() => {
+    if (runtime.mode !== "demo") return;
     const timer = window.setInterval(() => {
       setWorld((current) => tickWorld(current, Date.now()));
     }, 1600);
     return () => window.clearInterval(timer);
-  }, []);
+  }, [runtime.mode]);
 
   useEffect(() => {
     if (skipBootBriefRef.current) {
@@ -257,13 +273,14 @@ export function OpsProvider({ children }: { children: ReactNode }) {
     },
     toggle: (id) => setWorld((current) => toggleAssign(current, id)),
     deploy: (title, extras) => {
+      if (runtime.mode === "runtime") { void runtime.start(title, extras?.brief || title); return; }
       setSettleError("");
       setWorld((current) => deployMission(current, title, Date.now(), extras));
       enqueueLine("commander", DEPLOY_LINE);
     },
-    pause: () => setWorld((current) => setRunning(current, false)),
-    resume: () => setWorld((current) => setRunning(current, true)),
-    pulse: () => setWorld((current) => pulseNetwork(current, Date.now())),
+    pause: () => runtime.mode === "demo" && setWorld((current) => setRunning(current, false)),
+    resume: () => runtime.mode === "demo" && setWorld((current) => setRunning(current, true)),
+    pulse: () => runtime.mode === "demo" && setWorld((current) => pulseNetwork(current, Date.now())),
     scanRadar: () => {
       setWorld((current) => beginRadarScan(current, Date.now()));
       void (async () => {
@@ -296,12 +313,14 @@ export function OpsProvider({ children }: { children: ReactNode }) {
       })();
     },
     decide: (decision) => {
+      if (runtime.mode !== "demo") return;
       setWorld((current) => decideGate(current, decision, Date.now()));
       enqueueLine(decision === "kill" ? "guardian" : "analyst", decision === "kill"
         ? "Route killed. Mandate spend untouched."
         : "Evidence accepted. Settlement is armed.");
     },
     settle: () => {
+      if (runtime.mode !== "demo") return;
       const mission = worldRef.current.mission;
       if (!mission) return;
       setSettling(true);
@@ -320,7 +339,7 @@ export function OpsProvider({ children }: { children: ReactNode }) {
     },
     report: (id) => {
       const agentId = id || worldRef.current.selectedId;
-      const line = reportLine(worldRef.current, agentId);
+      const line = runtime.mode === "runtime" ? runtime.snapshot?.agents.find(a => a.id === agentId)?.reply || "No runtime response yet." : reportLine(worldRef.current, agentId);
       setWorld((current) => selectAgent(current, agentId));
       setQueue((current) => {
         const next = promote(enqueue(current, agentId, line), agentId);
@@ -339,7 +358,7 @@ export function OpsProvider({ children }: { children: ReactNode }) {
     holdVoice,
     releaseVoice,
     agentWantsVoice: (id) => isWanting(queue, id),
-  }), [audible, enqueueLine, holdVoice, promoteVoice, queue, releaseVoice, settleError, settling, speech, voiceMeta, wanting, world]);
+  }), [audible, enqueueLine, holdVoice, promoteVoice, queue, releaseVoice, settleError, settling, speech, voiceMeta, wanting, world, runtime]);
 
   apiRef.current = {
     pause: value.pause,

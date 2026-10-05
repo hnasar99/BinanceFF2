@@ -6,17 +6,18 @@ import { OnboardingTour } from "./onboarding-tour";
 import { OpsHud } from "./ops-hud";
 import { OpsProvider } from "./ops-context";
 import "./spatial-next.css";
+import { AgentRuntimeProvider } from "./runtime-context";
 
 export function SpatialNextApp() {
   return (
     <SpatialI18nProvider>
-      <OpsProvider>
+      <AgentRuntimeProvider><OpsProvider>
         <div className="cockpit-root">
           <CinematicOverlay />
           <OnboardingTour />
           <OpsHud />
         </div>
-      </OpsProvider>
+      </OpsProvider></AgentRuntimeProvider>
     </SpatialI18nProvider>
   );
 }
